@@ -10,43 +10,43 @@
 namespace graph_utils {
 
 // Node class for representing a graph.
-template<typename T>
+template<typename ValueType, typename WeightType>
 class Node {
 public:
-  Node(T value, int id) : value(value), id(id) { }
+  Node(ValueType value, int id) : value(value), id(id) { }
 
   // WARNING: This method does not check for duplicate neighbors.
   // For that, use add_neighbor_safe.
-  void add_neighbor(Node<T>* node, double weight);
+  void add_neighbor(Node<ValueType,WeightType>* node, WeightType weight);
 
-  void add_neighbor_safe(Node<T>* node, double weight);
+  void add_neighbor_safe(Node<ValueType,WeightType>* node, WeightType weight);
 
-  void remove_neighbor(Node<T>* node);
+  void remove_neighbor(Node<ValueType,WeightType>* node);
   
   void remove_neighbor(int node_id);
 
   int id;
-  T value;
-  std::vector<Node<T>*> neighbors;
-  std::vector<double> weights;
+  ValueType value;
+  std::vector<Node<ValueType,WeightType>*> neighbors;
+  std::vector<WeightType> weights;
 };
 
-template<typename T, bool is_directed>
+template<typename ValueType, typename WeightType, bool is_directed>
 class Graph {
 public:
-  Graph(std::vector<T> values, std::vector<std::pair<int, int>> edges,
-        std::vector<double> weights);
+  Graph(std::vector<ValueType> values, std::vector<std::pair<int, int>> edges,
+        std::vector<WeightType> weights);
 
-  void add_edge(int id1, int id2, double weight);
+  void add_edge(int id1, int id2, WeightType weight);
 
   void remove_edge(int id1, int id2);
 
-  bool has_edge(int id1, int id2, double* weight);
+  bool has_edge(int id1, int id2, WeightType* weight);
 
   std::string to_string() const;
 
   friend std::ostream& operator<<(std::ostream& Str,
-      const Graph<T, is_directed>& v) {
+      const Graph<ValueType,WeightType,is_directed>& v) {
     for (int i = 0; i < v.nodes.size(); i++) {
       Str << v.nodes[i]->value << ": ";
       for (auto neighbor : v.nodes[i]->neighbors) {
@@ -57,7 +57,7 @@ public:
     return Str;
   }
 
-  std::vector<std::unique_ptr<Node<T>>> nodes;
+  std::vector<std::unique_ptr<Node<ValueType,WeightType>>> nodes;
 };
 
 } // namespace graph_utils

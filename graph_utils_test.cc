@@ -1,9 +1,9 @@
-#include "graph_utils.h"
+#include "graph_utils.hpp"
 
 int main() {
   using namespace graph_utils;
   using namespace std;
-  Graph<int,true> directed({0,1,2,3,4,5}, {{1,2},{4,5},{3,2},{3,1},},
+  Graph<int,double,true> directed({0,1,2,3,4,5}, {{1,2},{4,5},{3,2},{3,1},},
       {1.0, 2.0, 3.0, 4.0});
   string expected = "0: \n1: 2 \n2: \n3: 2 1 \n4: 5 \n5: \n";
   if (expected == directed.to_string()) {
@@ -24,7 +24,7 @@ int main() {
          << directed.to_string() << endl; 
   }
 
-  Graph<int,false> undirected({0,1,2,3,4,5}, {{1,2},{4,5},{3,2},{3,1},},
+  Graph<int,double,false> undirected({0,1,2,3,4,5}, {{1,2},{4,5},{3,2},{3,1},},
       {1.0, 2.0, 3.0, 4.0});
   expected = "0: \n1: 2 3 \n2: 1 3 \n3: 2 1 \n4: 5 \n5: 4 \n";
   if (expected == undirected.to_string()) {
