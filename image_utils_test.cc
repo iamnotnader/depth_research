@@ -150,5 +150,77 @@ int main() {
   LOG2("Got the following output_matrix: " << endl << output_mat_3);
   LOG2("Expected the following output_matrix: " << endl << expected_mat_5);
 
+  int slice_arr_1[16] = {1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16};
+  Mat slice_mat_1(4,4, CV_32SC1, &slice_arr_1);
+  Mat output_slice_mat_1;
+  int expected_slice_arr_1[4] = {1, 2, 5, 6};
+  Mat expected_slice_mat_1(2, 2, CV_32SC1, &expected_slice_arr_1);
+  image_utils::internal::GetImageSlice(slice_mat_1, &output_slice_mat_1,
+      0, 0, 2, 2);
+  EXPECT_TRUE(
+      MatsAreEqual(output_slice_mat_1, expected_slice_mat_1),
+      "PASSED: GetImageSlice2x2At0,0",
+      "FAILED: GetImageSlice2x2At0,0"
+  );
+  LOG2("Created the following input_matrix: " << endl << slice_mat_1);
+  LOG2("Slicing: 0 0 2 2");
+  LOG2("Expected the following output_matrix: " << endl
+      << expected_slice_mat_1);
+  LOG2("Got the following output_matrix: " << endl << output_slice_mat_1);
+
+  int slice_arr_2[16] = {1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16};
+  Mat slice_mat_2(4,4, CV_32SC1, &slice_arr_2);
+  Mat output_slice_mat_2;
+  int expected_slice_arr_2[2] = {6, 7};
+  Mat expected_slice_mat_2(1, 2, CV_32SC1, &expected_slice_arr_2);
+  image_utils::internal::GetImageSlice(slice_mat_2, &output_slice_mat_2,
+      1, 1, 2, 1);
+  EXPECT_TRUE(
+      MatsAreEqual(output_slice_mat_2, expected_slice_mat_2),
+      "PASSED: GetImageSlice2x1At1,1",
+      "FAILED: GetImageSlice2x1At1,1"
+  );
+  LOG2("Created the following input_matrix: " << endl << slice_mat_2);
+  LOG2("Slicing: 1 1 2 1");
+  LOG2("Expected the following output_matrix: " << endl
+      << expected_slice_mat_2);
+  LOG2("Got the following output_matrix: " << endl << output_slice_mat_2);
+
+  int slice_arr_3[16] = {1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16};
+  Mat slice_mat_3(4,4, CV_32SC1, &slice_arr_3);
+  Mat output_slice_mat_3;
+  int expected_slice_arr_3[6] = {16, 15, 14, 12, 11, 10};
+  Mat expected_slice_mat_3(2, 3, CV_32SC1, &expected_slice_arr_3);
+  image_utils::internal::GetImageSlice(slice_mat_3, &output_slice_mat_3,
+      3, 3, 3, 2);
+  EXPECT_TRUE(
+      MatsAreEqual(output_slice_mat_3, expected_slice_mat_3),
+      "PASSED: GetImageSlice2x3At3,3",
+      "FAILED: GetImageSlice2x3At3,3"
+  );
+  LOG2("Created the following input_matrix: " << endl << slice_mat_3);
+  LOG2("Slicing: 3 3 3 2");
+  LOG2("Expected the following output_matrix: " << endl
+      << expected_slice_mat_3);
+  LOG2("Got the following output_matrix: " << endl << output_slice_mat_3);
+
+  int slice_arr_4[16] = {1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16};
+  Mat slice_mat_4(4, 2, CV_32SC2, &slice_arr_4);
+  Mat output_slice_mat_4;
+  int expected_slice_arr_4[6] = {7, 8, 5, 6};
+  Mat expected_slice_mat_4(1, 2, CV_32SC2, &expected_slice_arr_4);
+  image_utils::internal::GetImageSlice(slice_mat_4, &output_slice_mat_4,
+      1, 1, 2, 1);
+  EXPECT_TRUE(
+      MatsAreEqual(output_slice_mat_4, expected_slice_mat_4),
+      "PASSED: GetImageSlice1x2At1,1TwoChannel",
+      "FAILED: GetImageSlice1x2At1,1TwoChannel"
+  );
+  LOG2("Created the following input_matrix: " << endl << slice_mat_4);
+  LOG2("Slicing: 1 1 2 1");
+  LOG2("Expected the following output_matrix: " << endl
+      << expected_slice_mat_4);
+  LOG2("Got the following output_matrix: " << endl << output_slice_mat_4);
+
   return 0;
 }

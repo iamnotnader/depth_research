@@ -9,7 +9,9 @@ using std::endl;
 using std::cout;
 using std::abs;
 
-namespace {
+namespace image_utils {
+
+namespace internal {
 
 template<typename T>
 Status ConvolveOnePixel(const Mat& image_in, Mat* image_out,
@@ -92,13 +94,44 @@ Status ConvolveOnePixel(const Mat& image_in, Mat* image_out,
   return Status::SUCCESS;
 }
 
-} // namespace
+status_defs::Status GetImageSlice(const Mat& image_in, Mat* slice,
+    int row_index, int col_index, int window_width, int window_height) {
+  *slice = Mat(window_height, window_width, image_in.type());
+  for (int i = 0; i < window_height; i++) {
+    for (int j = 0; j < window_width; j++) {
+      LOG2("" << i << " " << j);
+      int input_row = i + row_index;
+      int input_col = j + col_index;
 
-namespace image_utils {
+      // If we are out of bounds of the image, use its reflection.
+      if (input_row >= image_in.rows) {
+        input_row = 2*image_in.rows  - input_row - 2;
+      }
+      if (input_col >= image_in.cols) {
+        input_col = 2*image_in.cols - input_col - 2;
+      }
+
+      int es = image_in.elemSize();
+      int image_data_index = input_row*image_in.cols*es +
+                             input_col*es;
+      uchar* image_in_bytes = image_in.data + image_data_index;;
+      uchar* slice_bytes = slice->data;
+      for (size_t c = 0; c < image_in.elemSize(); c++) {
+        LOG3("image index: " << image_data_index + c);
+        slice_bytes[i*window_width*es + j*es+c] = image_in_bytes[c];
+      }
+      LOG2("image indices: " << input_row << " " << input_col << " " << image_data_index);
+    }
+  }
+  return status_defs::Status::SUCCESS;
+}
+
+} // namespace internal
 
 status_defs::Status ConvolveImageWithFilter(const cv::Mat& image_in,
     cv::Mat* image_out, CONVOLUTION_FUNC filter, int filter_width,
     int filter_height) {
+  using namespace internal;
   assert(image_in.rows == image_out->rows);
   assert(image_in.cols == image_out->cols);
   assert(image_in.depth() == image_out->depth());
@@ -151,6 +184,21 @@ bool MatsAreEqual(const Mat& mat1, const Mat& mat2) {
   }
   LOG2("Mats are equal.");
   return true;
+}
+
+status_defs::Status ApplyWindowFunctionToImage(const cv::Mat& image_in,
+    cv::Mat* image_out, WINDOW_FUNC func, int window_width, int window_height) {
+  using namespace internal;
+  for (int i = 0; i < image_in.rows; i++) {
+    for (int j = 0; j < image_in.cols; j++) {
+      Mat slice;
+      GetImageSlice(image_in, &slice, i, j, window_width, window_height);
+      // get the slice
+      // pass it to your func
+      // get the output of your func and put it in your output
+    }
+  }
+  return status_defs::Status::SUCCESS;
 }
 
 } // namespace image_utils
