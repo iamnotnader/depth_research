@@ -1,5 +1,6 @@
 #include "compute_depth.h"
 #include "logging_utils.h"
+#include <algorithm>
 #include <math.h>
 
 using cv::Mat;
@@ -10,65 +11,67 @@ using std::pair;
 using std::unique_ptr;
 using std::vector;
 using std::min;
+using std::max;
+using std::reverse;
 
 namespace compute_depth {
 
-const Answer& dummy_answer = Answer(0, {});
-
-const Answer& DepthComputer::compute_correspondence_for_line(
-    int left_pixel, int img_start, int img_end, int row) {
-  LOG3("compute_correspondence_for_line: left_pixel-> " << left_pixel
-      << " img_start-> " << img_start << " img_end-> " << img_end << " row-> "
-      << row);
-  // Simple base case.
-  if (left_pixel == img_end) {
-    LOG3("compute_correspondence_for_line: Reached end of image.");
-    return dummy_answer;
+void DepthComputer::initialize_cost(int row) {
+  for (auto i = 0; i < right_cols; i++) {
+    set_cost(i, 0, i*occlusion_penalty);
+    set_previous_move(i, 0, PreviousMove::OccludeRight);
   }
-
-  // Try to return the answer for this (left_pixel, img_start) pair from the
-  // cache.
-  auto&& params = std::make_pair(left_pixel, img_start);
-  map<pair<int,int>,Answer>::iterator it =
-      map_ptr->find(params);
-  if (it != map_ptr->end()) {
-    LOG3("compute_correspondence_for_line: Found cached answer");
-    return it->second;
+  for (auto i = 0; i < left_cols; i++) {
+    set_cost(0, i, i*occlusion_penalty);
+    set_previous_move(0, i, PreviousMove::OccludeLeft);
   }
-
-  // Try to correspond left_pixel with all the pixels in the right image and
-  // compute the cost of each placement recursively, keeping track of the best
-  // placement we've seen.
-  vector<int> rest_of_shit;
-  int max_disparity = min(img_end, img_start+MAX_DISPARITY);
-  int best_pos_to_try = -1;
-  double best_cost = std::numeric_limits<double>::infinity();
-  for (int pos_to_try = img_start; pos_to_try < max_disparity; pos_to_try++) {
-    double pixel_cost = error_func_(image_left_, image_right_, row, left_pixel,
-        row, pos_to_try);
-
-    const Answer& rest_assuming_pos =
-        compute_correspondence_for_line(
-            left_pixel+1, pos_to_try, img_end, row);
-    double total_pos_cost = pixel_cost + rest_assuming_pos.cost;
-    if (total_pos_cost < best_cost) {
-      best_cost = total_pos_cost;
-      best_pos_to_try = pos_to_try;
+  for (int i = 1; i < right_cols; i++) {
+    for (int j = 1; j < left_cols; j++) {
+      double occlude_left = get_cost(i, j-1) + occlusion_penalty;
+      double occlude_right = get_cost(i-1, j) + occlusion_penalty;
+      double correspond_pixels = get_cost(i-1, j-1) +
+          error_func_(image_left_, image_right_, row, j-1, row, i-1);
+      double min_path_cost =
+          min(occlude_left, min(occlude_right, correspond_pixels));
+      set_cost(i, j, min_path_cost);
+      if (min_path_cost == occlude_left) {
+        set_previous_move(i, j, PreviousMove::OccludeLeft);
+      } else if (min_path_cost == occlude_right) {
+        set_previous_move(i, j, PreviousMove::OccludeRight);
+      } else {
+        set_previous_move(i, j, PreviousMove::Match);
+      }
     }
   }
-  const Answer& rest_assuming_pos =
-      compute_correspondence_for_line(
-          left_pixel+1, best_pos_to_try, img_end, row);
-  Answer best_answer(best_cost, {best_pos_to_try});
-  for (int corr : rest_assuming_pos.correspondences) {
-    assert(corr >= best_pos_to_try);
-    best_answer.correspondences.push_back(corr);
-  }
-  LOG3("compute_correspondence_for_line: Cost-> " << best_answer.cost);
+}
 
-  // Once we've found the best placement, add it to the map and return.
-  map_ptr->insert(make_pair(params, std::move(best_answer)));
-  return map_ptr->find(params)->second;
+vector<int> DepthComputer::compute_correspondence_for_line(int row) {
+  initialize_cost(row);
+  int right_pixel = image_right_.cols;
+  int left_pixel = image_left_.cols;
+  vector<int> ret;
+  while (left_pixel != 0) {
+    switch(get_previous_move(right_pixel, left_pixel)) {
+      case PreviousMove::Match: {
+        ret.push_back(right_pixel-1);
+        right_pixel--;
+        left_pixel--;
+        break;
+      } case PreviousMove::OccludeLeft: {
+        ret.push_back(-1);
+        left_pixel--;
+        break;
+      } case PreviousMove::OccludeRight: {
+        right_pixel--;
+        break;
+      } default: {
+        assert(false);
+      }
+    }
+  }
+  assert(ret.size() == image_left_.cols);
+  reverse(ret.begin(), ret.end());
+  return std::move(ret);
 };
 
 unique_ptr<Mat> DepthComputer::compute_depth_for_images() {
@@ -77,16 +80,22 @@ unique_ptr<Mat> DepthComputer::compute_depth_for_images() {
       CV_8UC1));
   for (int current_row = 0; current_row < image_left_.rows; current_row++) {
     LOG2("compute_depth_for_images: row: " << current_row);
-    map_ptr->clear();
-    const Answer& ans = compute_correspondence_for_line(0, 0, depth_map->cols,
-        current_row);
+    vector<int> correspondences =
+        compute_correspondence_for_line(current_row);
     for (int current_col = 0; current_col < image_left_.cols; current_col++) {
       LOG2("compute_depth_for_images: col: " << current_col);
-      int disparity = ans.correspondences[current_col] - current_col;
-      LOG2("compute_depth_for_images: disparity: " << disparity);
-      assert(disparity < MAX_DISPARITY);
-      uchar val = (uchar)disparity;
-      depth_map->at<uchar>(current_row, current_col, 0) = val;
+      if (correspondences[current_col] == -1) {
+        LOG3("Disparity: " << -1);
+        depth_map->at<unsigned int>(current_row, current_col, 0) = 0;
+      } else {
+        LOG3("Current col: " << current_col << " Correspondence: " <<
+             correspondences[current_col]);
+        int disparity =
+            (correspondences[current_col] - current_col)*10*256/left_cols;
+        depth_map->at<uchar>(current_row, current_col, 0) = disparity;
+        LOG3("Disparity: " << disparity << " UCHAR: "  <<
+             (int)depth_map->at<uchar>(current_row, current_col, 0));
+      }
     }
   }
   return std::move(depth_map);
@@ -107,26 +116,29 @@ int main(int argc, char** argv) {
       const cv::Mat& img1, const cv::Mat& img2, int row1, int col1, int row2,
       int col2) {
     const cv::Vec3b& left_pixel = img1.at<cv::Vec3b>(row1, col1);
-    const cv::Vec3b& right_pixel = img2.at<cv::Vec3b>(row2, col2);
-    double c1 = left_pixel.val[0] - right_pixel.val[0];
-    double c2 = left_pixel.val[1] - right_pixel.val[1];
-    double c3 = left_pixel.val[2] - right_pixel.val[2];
+    const cv::Vec3b& img_start = img2.at<cv::Vec3b>(row2, col2);
+    double c1 = left_pixel.val[0] - img_start.val[0];
+    double c2 = left_pixel.val[1] - img_start.val[1];
+    double c3 = left_pixel.val[2] - img_start.val[2];
     return c1*c1 + c2*c2 + c3*c3;
   };
   Mat image_1 = cv::imread(argv[1], 1);
   Mat image_2 = cv::imread(argv[2], 1);
-  compute_depth::DepthComputer comp(image_1, image_2, error_func);
-  unique_ptr<Mat> depth_map = comp.compute_depth_for_images();
+  LOG0("Error func same: " << error_func(image_1, image_2, 0, 0, 0, 0));
+  LOG0("Error func diff: " << error_func(image_1, image_2, 75, 70, 0, 0));
+  compute_depth::DepthComputer comp(image_1, image_2, error_func, 500);
+  unique_ptr<Mat> depth_map(comp.compute_depth_for_images());
 
   // Display the two input images.
   namedWindow("Left Image", cv::WINDOW_AUTOSIZE);
   imshow("Left Image", image_1);
   namedWindow("Right Image", cv::WINDOW_AUTOSIZE);
-  imshow("Left Image", image_2);
+  imshow("Right Image", image_2);
 
   // Display the computed depth map.
   namedWindow("Depth Map", cv::WINDOW_AUTOSIZE);
   imshow("Depth Map", *depth_map);
 
+  cv::waitKey();
   return 0;
 }
