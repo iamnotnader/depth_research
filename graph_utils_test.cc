@@ -1,14 +1,5 @@
 #include "graph_utils.hpp"
-
-template<typename T>
-std::ostream& cgreen(T s) {
-  return std::cout << "\033[1;32m" << s << "\033[0m";
-}
-
-template<typename T>
-std::ostream& cred(T s) {
-  return std::cout << "\033[1;31m" << s << "\033[0m";
-}
+#include "logging_utils.h"
 
 int main() {
   using namespace graph_utils;

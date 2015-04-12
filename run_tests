@@ -1,0 +1,13 @@
+echo "Compiling graph_utils_test..."
+clang++ -std=c++11 graph_utils_test.cc -lopencv_imgproc -lopencv_core -lopencv_highgui -DLOG_LEVEL_0
+echo "Running graph_utils_test..."
+./a.out
+echo "Compiling image_utils_test..."
+clang++ -std=c++11 image_utils_test.cc image_utils.cc -lopencv_imgproc -lopencv_core -lopencv_highgui -DLOG_LEVEL_0
+echo "Running image_utils_test..."
+./a.out
+echo "Running compute_depth_fast..."
+clang++ -std=c++11 image_utils.cc compute_depth_fast.cc -lopencv_imgproc -lopencv_core -lopencv_highgui -DLOG_LEVEL_0
+echo "Running compute_depth_fast tests..."
+./a.out
+

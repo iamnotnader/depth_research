@@ -45,6 +45,21 @@
 #define LOG_ERROR(str) std::cout << __func__ << ": " << str << std::endl
 #endif
 
-#define EXPECT_TRUE(x, y, z) if(x) {LOG0(y);} else {LOG0(z);}
+template<typename T>
+std::ostream& cgreen(T s) {
+  return std::cout << "\033[1;32m" << s << "\033[0m";
+}
+
+template<typename T>
+std::ostream& cred(T s) {
+  return std::cout << "\033[1;31m" << s << "\033[0m";
+}
+
+#define EXPECT_TRUE(x, y, z) \
+  if(x) {\
+    cgreen(y) << std::endl;\
+  } else {\
+    cred(z) << std::endl;\
+  }
 
 #endif

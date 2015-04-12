@@ -75,26 +75,20 @@ vector<int> DepthComputer::compute_correspondence_for_line(int row) {
 };
 
 unique_ptr<Mat> DepthComputer::compute_depth_for_images() {
-  LOG2("compute_depth_for_images: called.");
+  LOG2("Called.");
   unique_ptr<Mat> depth_map(new Mat(image_left_.rows, image_left_.cols,
       CV_8UC1));
   for (int current_row = 0; current_row < image_left_.rows; current_row++) {
-    LOG2("compute_depth_for_images: row: " << current_row);
+    LOG2(current_row*100/image_left_.rows << "%");
     vector<int> correspondences =
         compute_correspondence_for_line(current_row);
     for (int current_col = 0; current_col < image_left_.cols; current_col++) {
-      LOG2("compute_depth_for_images: col: " << current_col);
       if (correspondences[current_col] == -1) {
-        LOG3("Disparity: " << -1);
         depth_map->at<unsigned int>(current_row, current_col, 0) = 0;
       } else {
-        LOG3("Current col: " << current_col << " Correspondence: " <<
-             correspondences[current_col]);
         int disparity =
-            (correspondences[current_col] - current_col)*10*256/left_cols;
+            min(correspondences[current_col] - current_col, 255);
         depth_map->at<uchar>(current_row, current_col, 0) = disparity;
-        LOG3("Disparity: " << disparity << " UCHAR: "  <<
-             (int)depth_map->at<uchar>(current_row, current_col, 0));
       }
     }
   }
@@ -124,9 +118,7 @@ int main(int argc, char** argv) {
   };
   Mat image_1 = cv::imread(argv[1], 1);
   Mat image_2 = cv::imread(argv[2], 1);
-  LOG0("Error func same: " << error_func(image_1, image_2, 0, 0, 0, 0));
-  LOG0("Error func diff: " << error_func(image_1, image_2, 75, 70, 0, 0));
-  compute_depth::DepthComputer comp(image_1, image_2, error_func, 500);
+  compute_depth::DepthComputer comp(image_1, image_2, error_func, 1000);
   unique_ptr<Mat> depth_map(comp.compute_depth_for_images());
 
   // Display the two input images.

@@ -18,6 +18,11 @@ enum PreviousMove { Match, OccludeLeft, OccludeRight };
 // epipolar lines corresponds to the same row in both images. Practically,
 // this is equivalent to saying both images are taken by one camera that has
 // been shifted to the right, without changing any of the other coordinates.
+//
+// Computes depth by creating matrix of size left_cols x right_cols, where
+// left_cols and right_cols are the number of columns in each of the respective
+// images. This can be made more efficient if we assume the disparity can
+// be no larger than some value D.
 class DepthComputer {
  public:
   DepthComputer(const cv::Mat& image_left, const cv::Mat& image_right,
