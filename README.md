@@ -1,6 +1,9 @@
-Compile the tests with: 
-clang++ image_utils.cc image_utils_test.cc -lopencv_core -lopencv_highgui \
-    -lopencv_imgproc -std=c++11 -DLOG_LEVEL_0
+This is a library to produce really accurate "dens" depth maps *efficiently*
+using collections of images.
 
-Run the tests with:
-./a.out
+To see it in action, just do:
+$ ./run_tests
+
+Results as of 4/12/2015 (using dynamic programming):
+![alt tag](http://i.imgur.com/5etbude.jpg)
+
