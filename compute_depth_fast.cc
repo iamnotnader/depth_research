@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <math.h>
 #include "image_utils.h"
+#include "opencv2/highgui/highgui.hpp"
 
 using cv::Mat;
 using std::function;
@@ -74,7 +75,8 @@ void DepthComputerFast::initialize_cost(int row) {
       int right_pixel_index = i-1;
       double correspond_pixels = std::numeric_limits<double>::max();
       if (left_pixel_index >= 0 && right_pixel_index >= 0 &&
-          left_pixel_index < image_left_.cols && right_pixel_index < image_right_.cols) {
+          left_pixel_index < image_left_.cols && right_pixel_index <
+          image_right_.cols) {
         correspond_pixels = get_cost(i-1, j) +
             error_func_(image_left_, image_right_, row, left_pixel_index, row,
                         right_pixel_index);
@@ -130,12 +132,13 @@ vector<int> DepthComputerFast::compute_correspondence_for_line(int row) {
     }
   }
   assert(ret.size() == image_left_.cols);
-  reverse(ret.begin(), ret.end());
   #ifdef LOG_LEVEL_3
+  std::cout << "RET: " << std::endl;
   for (auto x : ret) {
     std::cout << x << " ";
   }
   #endif
+  reverse(ret.begin(), ret.end());
   return std::move(ret);
 };
 
@@ -148,86 +151,94 @@ unique_ptr<Mat> DepthComputerFast::compute_depth_for_images() {
     vector<int> correspondences =
         compute_correspondence_for_line(current_row);
     for (int current_col = 0; current_col < image_left_.cols; current_col++) {
-      if (correspondences[current_col] == -1) {
-        depth_map->at<unsigned int>(current_row, current_col, 0) = 0;
-      } else {
-        // TODO(daddy): Should make sure disparity maps to [0, 256). Luckily
-        // it's rare to find things more than 256 pixels away..
-        int disparity =
-            min(correspondences[current_col] - current_col, 255);
-        depth_map->at<uchar>(current_row, current_col, 0) = disparity;
+      // Try reversing the pictures to prevent this from happening.
+      int disparity = correspondences[current_col] - current_col;
+      if (disparity < 0) {
+        disparity = 0;
       }
+      assert(disparity <= max_disparity_);
+      disparity = disparity * 255 / max_disparity_;
+      depth_map->at<uchar>(current_row, current_col, 0) = disparity;
     }
   }
   return std::move(depth_map);
 }
 
+double get_intensity(const cv::Vec3b& pixel) {
+  double c1 = pixel.val[0];
+  double c2 = pixel.val[1];
+  double c3 = pixel.val[2];
+  return c1+c2+c3;
+}
+
+double pointwise_error(
+    const cv::Mat& img1, const cv::Mat& img2, int row1, int col1, int row2,
+    int col2) {
+  assert(col1 >= 0 && row1 >= 0);
+  assert(col1 < img1.cols && row1 < img1.rows);
+  assert(col2 >= 0 && row2 >= 0);
+  assert(col2 < img2.cols && row2 < img2.rows);
+  const cv::Vec3b& left_pixel = img1.at<cv::Vec3b>(row1, col1);
+  const cv::Vec3b& right_pixel = img2.at<cv::Vec3b>(row2, col2);
+  double c1 = left_pixel.val[0] - right_pixel.val[0];
+  double c2 = left_pixel.val[1] - right_pixel.val[1];
+  double c3 = left_pixel.val[2] - right_pixel.val[2];
+  return c1*c1 + c2*c2 + c3*c3;
+}
+
+double census_error(
+    const cv::Mat& img1, const cv::Mat& img2, int row1, int col1, int row2,
+    int col2) {
+  assert(col1 >= 0 && row1 >= 0);
+  assert(col1 < img1.cols && row1 < img1.rows);
+  assert(col2 >= 0 && row2 >= 0);
+  assert(col2 < img2.cols && row2 < img2.rows);
+
+  LOG3("row1: " << row1 << " col1: " << col1 << " row2: " << row2 << " col2: "
+       << col2 << std::endl);
+  double census_sum = 0.0;
+  int num_pixels_used = 0;
+  const cv::Vec3b& left_pixel_mid = img1.at<cv::Vec3b>(row1, col1);
+  const cv::Vec3b& right_pixel_mid = img2.at<cv::Vec3b>(row2, col2);
+  for (int i = 0; i < 5; i++) {
+    for (int j = 0; j < 5; j++) {
+      int left_image_col = col1 - 2 + i;
+      int left_image_row = row1 - 2 + j;
+      int right_image_col = col2 - 2 + i;
+      int right_image_row = row2 - 2 + j;
+      if (left_image_col < 0 || left_image_col >= img1.cols ||
+          right_image_col < 0 || right_image_col >= img2.cols ||
+          left_image_row < 0 || left_image_row >= img1.rows ||
+          right_image_row < 0 || right_image_row >= img2.rows) {
+        continue;
+      }
+
+      const cv::Vec3b& left_pixel =
+          img1.at<cv::Vec3b>(left_image_row, left_image_col);
+      const cv::Vec3b& right_pixel =
+          img2.at<cv::Vec3b>(right_image_row, right_image_col);
+
+      double left_mid_intensity = get_intensity(left_pixel_mid);
+      double left_intensity = get_intensity(left_pixel);
+      double right_intensity = get_intensity(right_pixel);
+      double right_mid_intensity = get_intensity(right_pixel_mid);
+
+      bool left_pixel_larger = left_intensity > left_mid_intensity;
+      bool right_pixel_larger = right_intensity > right_mid_intensity;
+      if (left_pixel_larger != right_pixel_larger) {
+        census_sum += 1;
+      }
+
+      LOG3("lr: " << left_image_row << " lc: " << left_image_col
+          << " rr: " << right_image_row << " rc: " << right_image_col
+          << " left_bool: " << left_pixel_larger << " right_bool: "
+          << right_pixel_larger << " agree?: "
+          << (left_pixel_larger == right_pixel_larger) <<  std::endl);
+      num_pixels_used++;
+    }
+  }
+  return census_sum / num_pixels_used;
+}
+
 } // namespace compute_depth_fast
 
-#include "opencv2/highgui/highgui.hpp"
-using cv::imshow;
-int main(int argc, char** argv) {
-  LOG0("Running...");
-
-  compute_depth_fast::ErrorFunc error_func = [](
-      const cv::Mat& img1, const cv::Mat& img2, int row1, int col1, int row2,
-      int col2) {
-    assert(col1 >= 0 && row1 >= 0);
-    assert(col1 < img1.cols && row1 < img1.rows);
-    assert(col2 >= 0 && row2 >= 0);
-    assert(col2 < img2.cols && row2 < img2.rows);
-    const cv::Vec3b& left_pixel = img1.at<cv::Vec3b>(row1, col1);
-    const cv::Vec3b& img_start = img2.at<cv::Vec3b>(row2, col2);
-    double c1 = left_pixel.val[0] - img_start.val[0];
-    double c2 = left_pixel.val[1] - img_start.val[1];
-    double c3 = left_pixel.val[2] - img_start.val[2];
-    return c1*c1 + c2*c2 + c3*c3;
-  };
-
-  if (argc == 1) {
-    LOG0("No arguments found-- running tests.");
-    LOG0("To actually use run: ./a.out <image_1.jpg> <image_2.jpg>");
-
-    // TODO(daddy): Move this test out into a separate test file.
-    uchar left[12] = {200,0,0,100,0,0,0,0,0,0,0,0};
-    uchar right[12] = {0,0,0,0,0,0,200,0,0,100,0,0};
-    cv::Mat m1(1, 4, CV_8UC3, &left);
-    cv::Mat m2(1, 4, CV_8UC3, &right);
-    compute_depth_fast::DepthComputerFast comp(m1,m2, error_func, 100, 2);
-    unique_ptr<Mat> depth_map(comp.compute_depth_for_images());
-    uchar expected_arr[4] = {2, 2, 0, 0};
-    cv::Mat expected_mat({1, 4, CV_8UC1, &expected_arr});
-    if (!MatsAreEqual(expected_mat, *depth_map)) {
-      cred("Failed: {2, 2, 0, 0}");
-      LOG0("Expected: " << expected_mat << std::endl << "But got: " <<
-          *depth_map);
-    } else {
-      cgreen("PASSED: {2, 2, 0, 0}") << std::endl;
-    }
-    // End test.
-    return 0;
-  } else if (argc < 3) {
-    std::cout << "usage: register_images <image_1.jpg> <image_2.jpg>"
-              << std::endl;
-    return -1;
-  }
-
-  Mat image_1 = cv::imread(argv[1], 1);
-  Mat image_2 = cv::imread(argv[2], 1);
-  compute_depth_fast::DepthComputerFast comp2(image_1, image_2, error_func,
-      1000, 50);
-  unique_ptr<Mat> depth_map2(comp2.compute_depth_for_images());
-
-  // Display the two input images.
-  namedWindow("Left Image", cv::WINDOW_AUTOSIZE);
-  imshow("Left Image", image_1);
-  namedWindow("Right Image", cv::WINDOW_AUTOSIZE);
-  imshow("Right Image", image_2);
-
-  // Display the computed depth map.
-  namedWindow("Depth Map", cv::WINDOW_AUTOSIZE);
-  imshow("Depth Map", *depth_map2);
-
-  cv::waitKey();
-  return 0;
-}
