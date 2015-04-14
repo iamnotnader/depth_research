@@ -1,4 +1,4 @@
-This is a library to produce really accurate "dens" depth maps *efficiently*
+This is a library to produce really accurate "dense" depth maps *efficiently*
 using collections of images.
 
 To see it in action, just do:
