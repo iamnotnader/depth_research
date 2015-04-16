@@ -15,4 +15,7 @@ echo "Running max_flow tests..."
 ./a.out
 clang++ -std=c++11 min_st_cut_test.cc -DLOG_LEVEL_0
 ./a.out
+clang++ -std=c++11 run_depth_computer.cc compute_depth_fast.cc -lopencv_imgproc -lopencv_core -lopencv_highgui -DLOG_LEVEL_0
+echo "Computing depth for sample images."
+./a.out sample_left.png sample_right.png
 
