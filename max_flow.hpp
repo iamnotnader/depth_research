@@ -1,6 +1,10 @@
+#ifndef MAX_FLOW_HPP
+#define MAX_FLOW_HPP
+
 #include "max_flow.h"
 #include <limits>
 #include <algorithm>
+#include "logging_utils.h"
 
 namespace max_flow {
 
@@ -40,6 +44,10 @@ bool path_contains_node(const vector<Node<ValueType,EdgeCapacity>*>& path,
 // Tries to find an augmenting path. Puts the path in "path" and returns true
 // if an augmenting path exists. Otherwise, leaves "path" empty and returns
 // false.
+//
+// TODO(daddy): Consider using bfs instead of dfs, since its choice of
+// augmenting path tends to lead to fewer iterations. Also recursion is
+// not as performant.
 template<typename ValueType>
 bool find_augmenting_path(
     Node<ValueType,EdgeCapacity>* source,
@@ -57,7 +65,7 @@ bool find_augmenting_path(
   const vector<NODE*>& neighbors = source->neighbors;
   const vector<EdgeCapacity>& weights = source->weights; 
   for (int i = 0; i < neighbors.size(); i++) {
-    if (weights[i].flow < weights[i].capacity &&
+    if (weights[i].residual() > 0 &&
         !path_contains_node(*path, neighbors[i])) {
       // explore this node
       bool is_augmenting_path = find_augmenting_path(neighbors[i], sink, path);
@@ -77,8 +85,6 @@ bool find_augmenting_path(
 template<typename ValueType>
 double compute_max_flow(Graph<ValueType,EdgeCapacity,false>* g) {
   typedef Node<ValueType,EdgeCapacity> NODE;
-  // Add pairs of Node* to edges
-  // Add weights for the edges to weights
   auto& nodes = g->nodes;
   NODE* source = nodes[0].get();
   NODE* sink = nodes[1].get();
@@ -91,10 +97,14 @@ double compute_max_flow(Graph<ValueType,EdgeCapacity,false>* g) {
       internal::find_augmenting_path<ValueType>(source, sink, &path);
 
     if (!exists_augmenting_path) {
+      LOG3("Computing maximum flow by summing outflows from source.");
       // If no augmenting path exists, compute the maximum flow and return.
       double max_flow = 0.0;
       for (int i = 0; i < source->neighbors.size(); i++) {
-        assert(source->weights[i].flow > 0);
+        LOG3("flow: " << source->weights[i].flow << " capacity: "
+             << source->weights[i].capacity << " from: " << source->id
+             << " to: " << source->neighbors[i]->id);
+        assert(source->weights[i].flow >= 0);
         max_flow += source->weights[i].flow;
       }
       return max_flow;
@@ -110,7 +120,7 @@ double compute_max_flow(Graph<ValueType,EdgeCapacity,false>* g) {
       EdgeCapacity* edge = internal::get_edge_between(node_from, node_to);
 
       assert(edge != nullptr);
-      flow_to_add = std::min(flow_to_add, edge->residual());  
+      flow_to_add = std::min(flow_to_add, edge->residual());
     }
 
     // Add the flow we found to all the edges in the augmenting path.
@@ -137,3 +147,4 @@ double compute_max_flow(Graph<ValueType,EdgeCapacity,false>* g) {
 }
 
 } // namespace max_flow
+#endif

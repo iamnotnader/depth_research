@@ -45,6 +45,8 @@
 #define LOG_ERROR(str) std::cout << __func__ << ": " << str << std::endl
 #endif
 
+// TODO(daddy): Move these into the namespace below and fix everything that
+// uses them.
 template<typename T>
 std::ostream& cgreen(T s) {
   return std::cout << "\033[1;32m" << s << "\033[0m";
@@ -54,6 +56,31 @@ template<typename T>
 std::ostream& cred(T s) {
   return std::cout << "\033[1;31m" << s << "\033[0m";
 }
+
+// TODO(daddy): Figure out how to include this without causing compile errors.
+//namespace logging_utils {
+//#include <execinfo.h>
+//#include <signal.h>
+//#include <stdlib.h>
+//#include <unistd.h>
+//void logging_exception_handler (int sig) {
+  //void *array[20];
+  //size_t size;
+
+  //// get void*'s for all entries on the stack
+  //size = backtrace(array, 20);
+
+  //// print out all the frames to stderr
+  //fprintf(stderr, "Error: signal %d:\n", sig);
+  //backtrace_symbols_fd(array, size, STDERR_FILENO);
+  //exit(1);
+//}
+
+//void print_stack_traces() {
+  //signal(SIGSEGV, logging_exception_handler);
+  //signal(SIGABRT, logging_exception_handler);
+//}
+//} // namespace logging_utils
 
 #define EXPECT_TRUE(x, y, z) \
   if(x) {\

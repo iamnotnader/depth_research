@@ -75,33 +75,6 @@ bool Test3x3Pointwise() {
   return false;
 }
 
-bool Test3x3Census() {
-  uchar left_img[27] = {0,0,0, 200,0,0, 200,0,0,
-                        0,0,0, 100,0,0, 100,0,0,
-                        100,0,0, 100,0,0, 0,0,0};
-  uchar right_img[27] = {0,0,0, 0,0,0, 200,0,0,
-                         0,0,0, 0,0,0, 100,0,0,
-                         0,0,0, 100,0,0, 100,0,0};
-
-  cv::Mat m1(3, 3, CV_8UC3, &left_img);
-  cv::Mat m2(3, 3, CV_8UC3, &right_img);
-  compute_depth_fast::DepthComputerFast comp(m1,m2,
-      compute_depth_fast::census_error, .1, 2);
-  unique_ptr<Mat> depth_map_census(comp.compute_depth_for_images());
-  uchar expected_arr[9] = {0,127,0,
-                           0,127,0,
-                           127,127,0};
-  cv::Mat expected_mat({3, 3, CV_8UC1, &expected_arr});
-  if (!MatsAreEqual(expected_mat, *depth_map_census)) {
-    cred("Failed: 3x3 census");
-    LOG0("Expected: " << expected_mat << std::endl << "But got: " <<
-        *depth_map_census);
-  } else {
-    cgreen("PASSED: 3x3 census") << std::endl;
-  }
-  return false;
-}
-
 bool Test3x3CensusSingleCell() {
   uchar left_img[27] = {0,0,0, 200,0,0, 200,0,0,
                         0,0,0, 100,0,0, 100,0,0,
@@ -176,7 +149,6 @@ int main() {
   TestSingleRowPointwise();
   TestSingleRowCensus();
   Test3x3Pointwise();
-  Test3x3Census();
   Test3x3CensusSingleCell();
   Test3x3CensusSingleCellAllSame();
   Test3x3CensusBig();

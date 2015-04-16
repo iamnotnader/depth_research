@@ -14,7 +14,7 @@ public:
   EdgeCapacity(double capacity)
       : capacity(capacity), flow(0) { }
 
-  double residual() {
+  double residual() const {
     return capacity - flow;
   }
 
@@ -22,8 +22,8 @@ public:
   double flow;
 };
 
-// Computes the minimum cut of an undirected graph.
-// returns edges and weights by reference.
+// Computes the maximum flow of an undirected graph.
+// Returns a graph with maximum flow for each edge by reference.
 template<typename ValueType>
 double compute_max_flow(graph_utils::Graph<ValueType,EdgeCapacity,false>* g); 
 

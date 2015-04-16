@@ -89,6 +89,9 @@ double pointwise_error(
     const cv::Mat& img1, const cv::Mat& img2, int row1, int col1, int row2,
     int col2);
 
+// TODO(daddy): The images generated with this error function suck-- but I feel
+// like they shouldn't. Figure out if it's a bug in the implementation or if
+// it's OK/expected for the images to suck.
 double census_error(
     const cv::Mat& img1, const cv::Mat& img2, int row1, int col1, int row2,
     int col2);

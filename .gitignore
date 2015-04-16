@@ -1,0 +1,6 @@
+*.swp
+TAGS
+*.gch
+*.o
+*.swo
+a.out

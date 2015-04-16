@@ -1,23 +1,14 @@
 #include "max_flow.hpp"
 #include <iostream>
 
-template<typename T>
-std::ostream& cgreen(T s) {
-  return std::cout << "\033[1;32m" << s << "\033[0m";
-}
-
-template<typename T>
-std::ostream& cred(T s) {
-  return std::cout << "\033[1;31m" << s << "\033[0m";
-}
-
 int main() {
   using namespace graph_utils;
   using namespace max_flow;
   using std::vector;
   using std::pair;
 
-  cout << "Running tests. Nodes are indexed. 0=source, 1=sink." << endl;
+  cout << "Running max flow tests. Nodes are indexed. 0=source, 1=sink."
+       << endl;
 
   // Node indexes, edges, and capacities
   Graph<int,EdgeCapacity,false> my_g({{0,1,2},{{1,2},{2,0}},{1.0,2.0}});

@@ -1,3 +1,6 @@
+#ifndef BARRIER_GRAPH_UTILS_HPP
+#define BARRIER_GRAPH_UTILS_HPP
+
 #include "graph_utils.h"
 
 #include <vector>
@@ -122,3 +125,4 @@ string Graph<ValueType,WeightType,is_directed>::to_string() const {
 }
 
 } // namespace graph_utils
+#endif
