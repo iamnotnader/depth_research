@@ -7,6 +7,6 @@ $ ./run_tests
 Note that you must first install the opencv libraries. You can do this with
 homebrew on OSX.
 
-Results as of 4/12/2015 (using dynamic programming):
+Results as of 4/12/2015 (using a dynamic programming approach):
 ![alt tag](http://i.imgur.com/qexurn3.jpg)
 
