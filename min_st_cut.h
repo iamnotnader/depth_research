@@ -1,10 +1,10 @@
-#ifndef BARRIER_MIN_CUT
-#define BARRIER_MIN_CUT
+#ifndef BARRIER_MIN_ST_CUT
+#define BARRIER_MIN_ST_CUT
 
 #include "max_flow.hpp"
 #include "graph_utils.hpp"
 
-namespace min_cut {
+namespace min_st_cut {
 
 template<typename ValueType>
 class MinCutEdge {
@@ -22,9 +22,9 @@ class MinCutEdge {
 // Computes the minimum st cut of an undirected graph.
 // Returns edges on the minimum st cut.
 template<typename ValueType>
-vector<MinCutEdge<ValueType>> compute_min_cut(
+vector<MinCutEdge<ValueType>> compute_min_st_cut(
     graph_utils::Graph<ValueType,max_flow::EdgeCapacity,false>* g); 
 
-} // namespace min_cut
+} // namespace min_st_cut
 
 #endif

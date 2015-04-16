@@ -13,6 +13,6 @@ echo "Running compute_depth_fast tests..."
 clang++ -std=c++11 max_flow_test.cc
 echo "Running max_flow tests..."
 ./a.out
-clang++ -std=c++11 min_cut_test.cc -DLOG_LEVEL_0
+clang++ -std=c++11 min_st_cut_test.cc -DLOG_LEVEL_0
 ./a.out
 

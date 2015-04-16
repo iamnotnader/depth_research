@@ -1,12 +1,12 @@
-#ifndef MIN_CUT_HPP
-#define MIN_CUT_HPP
+#ifndef MIN_ST_CUT_HPP
+#define MIN_ST_CUT_HPP
 
-#include "min_cut.h"
+#include "min_st_cut.h"
 #include <limits>
 #include <algorithm>
 #include "logging_utils.h"
 
-namespace min_cut {
+namespace min_st_cut {
 
 namespace internal {
 
@@ -45,7 +45,7 @@ vector<MinCutEdge<ValueType>> find_outgoing_edges(
     const vector<graph_utils::Node<ValueType,max_flow::EdgeCapacity>*>&
     reachable_nodes) {
   typedef graph_utils::Node<ValueType,max_flow::EdgeCapacity> NODE;
-  vector<MinCutEdge<ValueType>> min_cut_edges;
+  vector<MinCutEdge<ValueType>> min_st_cut_edges;
   for (NODE* reachable_node : reachable_nodes) {
     for (int i = 0; i < reachable_node->neighbors.size(); i++) {
       NODE* neighbor_node = reachable_node->neighbors[i];
@@ -54,17 +54,17 @@ vector<MinCutEdge<ValueType>> find_outgoing_edges(
           reachable_nodes.end()) {
         MinCutEdge<ValueType> node_to_add(reachable_node, neighbor_node,
                                           reachable_node->weights[i]);
-        min_cut_edges.push_back(node_to_add);
+        min_st_cut_edges.push_back(node_to_add);
       }
     }
   }
-  return std::move(min_cut_edges);
+  return std::move(min_st_cut_edges);
 }
 
 } // namespace internal
 
 template<typename ValueType>
-vector<MinCutEdge<ValueType>> compute_min_cut(
+vector<MinCutEdge<ValueType>> compute_min_st_cut(
     graph_utils::Graph<ValueType,max_flow::EdgeCapacity,false>* g) {
   typedef graph_utils::Node<ValueType,max_flow::EdgeCapacity> NODE;
   // First we compute the max flow for the graph. This sets the flow on all of
@@ -78,12 +78,12 @@ vector<MinCutEdge<ValueType>> compute_min_cut(
   vector<NODE*> reachable_nodes = internal::find_reachable_nodes(source);
 
   // Find edges connecting reachable vertices to non-reachable vertices.
-  vector<MinCutEdge<ValueType>> min_cut_edges = internal::find_outgoing_edges(
+  vector<MinCutEdge<ValueType>> min_st_cut_edges = internal::find_outgoing_edges(
       reachable_nodes);
   
-  return std::move(min_cut_edges);
+  return std::move(min_st_cut_edges);
 }
 
-} // namespace min_cut
+} // namespace min_st_cut
 
 #endif
