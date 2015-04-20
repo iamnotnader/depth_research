@@ -17,9 +17,10 @@ using graph_utils::Node;
 
 namespace internal { 
 
-template<typename ValueType>
-EdgeCapacity* get_edge_between(Node<ValueType,EdgeCapacity>* node_from,
-    Node<ValueType,EdgeCapacity>* node_to) {
+template<typename ValueType, typename EdgeType>
+EdgeCapacity<EdgeType>* get_edge_between(
+    Node<ValueType,EdgeCapacity<EdgeType>>* node_from,
+    Node<ValueType,EdgeCapacity<EdgeType>>* node_to) {
   for (int i = 0; i < node_from->neighbors.size(); i++) {
     if (node_from->neighbors[i] == node_to) {
       return &(node_from->weights[i]);
@@ -28,11 +29,12 @@ EdgeCapacity* get_edge_between(Node<ValueType,EdgeCapacity>* node_from,
   return nullptr;
 }
 
-template<typename ValueType>
-bool path_contains_node(const vector<Node<ValueType,EdgeCapacity>*>& path,
-    Node<ValueType,EdgeCapacity>* node) {
+template<typename ValueType, typename EdgeType>
+bool path_contains_node(
+    const vector<Node<ValueType,EdgeCapacity<EdgeType>>*>& path,
+    Node<ValueType,EdgeCapacity<EdgeType>>* node) {
 
-  typedef Node<ValueType,EdgeCapacity> NODE;
+  typedef Node<ValueType,EdgeCapacity<EdgeType>> NODE;
   for (const NODE* n : path) {
     if (n == node) {
       return true;
@@ -48,13 +50,13 @@ bool path_contains_node(const vector<Node<ValueType,EdgeCapacity>*>& path,
 // TODO(daddy): Consider using bfs instead of dfs, since its choice of
 // augmenting path tends to lead to fewer iterations. Also recursion is
 // not as performant.
-template<typename ValueType>
+template<typename ValueType, typename EdgeType>
 bool find_augmenting_path(
-    Node<ValueType,EdgeCapacity>* source,
-    Node<ValueType,EdgeCapacity>* sink,
-    vector<Node<ValueType,EdgeCapacity>*>* path) {
+    Node<ValueType,EdgeCapacity<EdgeType>>* source,
+    Node<ValueType,EdgeCapacity<EdgeType>>* sink,
+    vector<Node<ValueType,EdgeCapacity<EdgeType>>*>* path) {
 
-  typedef Node<ValueType,EdgeCapacity> NODE;
+  typedef Node<ValueType,EdgeCapacity<EdgeType>> NODE;
   if (source == nullptr || sink == nullptr) {
     return false;
   }
@@ -63,7 +65,7 @@ bool find_augmenting_path(
     return true;
   }
   const vector<NODE*>& neighbors = source->neighbors;
-  const vector<EdgeCapacity>& weights = source->weights; 
+  const vector<EdgeCapacity<EdgeType>>& weights = source->weights; 
   for (int i = 0; i < neighbors.size(); i++) {
     if (weights[i].residual() > 0 &&
         !path_contains_node(*path, neighbors[i])) {
@@ -82,12 +84,12 @@ bool find_augmenting_path(
 
 // Computes the minimum cut of an undirected graph.
 // returns edges and weights by reference.
-template<typename ValueType>
-double compute_max_flow(Graph<ValueType,EdgeCapacity,false>* g) {
-  typedef Node<ValueType,EdgeCapacity> NODE;
+template<typename ValueType, typename EdgeType>
+double compute_max_flow(Graph<ValueType,EdgeCapacity<EdgeType>,false>* g) {
+  typedef Node<ValueType,EdgeCapacity<EdgeType>> NODE;
   auto& nodes = g->nodes;
-  NODE* source = nodes[0].get();
-  NODE* sink = nodes[1].get();
+  NODE* source = &nodes[0];
+  NODE* sink = &nodes[1];
 
   vector<NODE*> path;
   while (true) {
@@ -117,7 +119,7 @@ double compute_max_flow(Graph<ValueType,EdgeCapacity,false>* g) {
     for (int i = 0; i < path.size()-1; i++) {
       NODE* node_from = path[i];
       NODE* node_to = path[i+1];
-      EdgeCapacity* edge = internal::get_edge_between(node_from, node_to);
+      EdgeCapacity<EdgeType>* edge = internal::get_edge_between(node_from, node_to);
 
       assert(edge != nullptr);
       flow_to_add = std::min(flow_to_add, edge->residual());
@@ -132,9 +134,9 @@ double compute_max_flow(Graph<ValueType,EdgeCapacity,false>* g) {
     for (int i = 0; i < path.size()-1; i++) {
       NODE* node_from = path[i];
       NODE* node_to = path[i+1];
-      EdgeCapacity* edge_forward =
+      EdgeCapacity<EdgeType>* edge_forward =
           internal::get_edge_between(node_from, node_to);
-      EdgeCapacity* edge_reverse =
+      EdgeCapacity<EdgeType>* edge_reverse =
           internal::get_edge_between(node_to, node_from);
 
       assert(edge_forward != nullptr);

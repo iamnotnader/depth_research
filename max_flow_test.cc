@@ -11,7 +11,7 @@ int main() {
        << endl;
 
   // Node indexes, edges, and capacities
-  Graph<int,EdgeCapacity,false> my_g({{0,1,2},{{1,2},{2,0}},{1.0,2.0}});
+  Graph<int,EdgeCapacity<int>,false> my_g({{0,1,2},{{1,2},{2,0}},{1.0,2.0}});
   double max_flow = compute_max_flow<int>(&my_g);
   if (max_flow == 1) {
     cgreen("PASSED: src <1> 2 <2> sink = 1") << endl;
@@ -20,7 +20,7 @@ int main() {
     cout << "Expected 1; Got: " << max_flow << endl;
   }
 
-  my_g = Graph<int,EdgeCapacity,false>(
+  my_g = Graph<int,EdgeCapacity<int>,false>(
       {{0,1,2,3},
       {{0,2},{0,3},{2,3},{2,1},{3,1}},
       {1.0,3.0,2.0,3.0,2.0}});
@@ -32,7 +32,7 @@ int main() {
     cout << "Expected 4; Got: " << max_flow << endl;
   }
 
-  my_g = Graph<int,EdgeCapacity,false>(
+  my_g = Graph<int,EdgeCapacity<int>,false>(
       {{0,1,2,3,4,5,6,7,8},
       {{0,2},{0,3},{0,4},{2,3},{3,4},{2,8},{2,6},{3,6},{3,5},{4,5},{5,6},
        {5,7},{4,7},{8,6},{6,7},{8,1},{6,1},{7,1}},

@@ -8,6 +8,7 @@
 #include <iostream>
 #include <assert.h>
 #include <sstream>
+#include "logging_utils.h"
 
 using std::vector;
 using status_defs::Status;
@@ -69,12 +70,11 @@ void Node<ValueType,WeightType>::remove_neighbor(int node_id) {
 }
 
 template<typename ValueType, typename WeightType, bool is_directed>
-Graph<ValueType,WeightType,is_directed>::Graph(vector<ValueType> values,
-    vector<pair<int, int>> edges, vector<WeightType> weights) {
+Graph<ValueType,WeightType,is_directed>::Graph(const vector<ValueType>& values,
+    const vector<pair<int, int>>& edges, const vector<WeightType>& weights) {
   assert(edges.size() == weights.size());
   for (size_t i = 0; i < values.size(); i++) {
-    nodes.push_back(std::unique_ptr<Node<ValueType,WeightType>>(
-          new Node<ValueType,WeightType>(i, values[i])));
+    nodes.push_back(Node<ValueType,WeightType>(values[i], i));
   }
   for (size_t i = 0; i < edges.size(); i++) {
     const pair<int, int>& edge = edges[i];
@@ -90,17 +90,25 @@ void  Graph<ValueType,WeightType,is_directed>::add_edge(int id1, int id2,
 
   auto& nodes = this->nodes;
   // If the graph is undirected, we add an edge in both directions.
-  nodes[id1]->add_neighbor_safe(nodes[id2].get(), weight);
+  // TODO(daddy): Make this not a disgusting hack...
+  #ifdef RUN_FAST
+  nodes[id1].add_neighbor(&(nodes[id2]), weight);
   if (!is_directed) {
-    nodes[id2]->add_neighbor_safe(nodes[id1].get(), weight);
+    nodes[id2].add_neighbor(&(nodes[id1]), weight);
   }
+  #else
+  nodes[id1].add_neighbor_safe(&(nodes[id2]), weight);
+  if (!is_directed) {
+    nodes[id2].add_neighbor_safe(&(nodes[id1]), weight);
+  }
+  #endif
 }
 
 template<typename ValueType, typename WeightType, bool is_directed>
 void Graph<ValueType,WeightType,is_directed>::remove_edge(int id1, int id2) {
-  nodes[id1]->remove_neighbor(nodes[id2].get());
+  nodes[id1].remove_neighbor(&nodes[id2]);
   if (!is_directed) {
-    nodes[id2]->remove_neighbor(nodes[id1].get());
+    nodes[id2].remove_neighbor(&nodes[id1]);
   }
 }
 
@@ -108,9 +116,9 @@ template<typename ValueType, typename WeightType, bool is_directed>
 bool Graph<ValueType,WeightType,is_directed>::has_edge(int id1, int id2,
     WeightType* weight) {
   auto& n1 = this->nodes[id1];
-  for (size_t i = 0; i < n1->neighbors.size(); i++) {
-    if (n1->neighbors[i]->id == id2) {
-      *weight = n1->weights[i];
+  for (size_t i = 0; i < n1.neighbors.size(); i++) {
+    if (n1.neighbors[i]->id == id2) {
+      *weight = n1.weights[i];
       return true;
     }
   }

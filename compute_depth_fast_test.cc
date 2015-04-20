@@ -154,4 +154,4 @@ int main() {
   Test3x3CensusBig();
 
   return 0;
-  }
+}

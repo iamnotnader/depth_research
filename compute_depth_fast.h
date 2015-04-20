@@ -42,8 +42,8 @@ class DepthComputerFast {
 
   std::unique_ptr<cv::Mat> compute_depth_for_images();
 
-  const cv::Mat image_left_;
-  const cv::Mat image_right_; 
+  const cv::Mat& image_left_;
+  const cv::Mat& image_right_; 
   const ErrorFunc error_func_;
   const double occlusion_penalty;
 

@@ -34,8 +34,9 @@ public:
 template<typename ValueType, typename WeightType, bool is_directed>
 class Graph {
 public:
-  Graph(std::vector<ValueType> values, std::vector<std::pair<int, int>> edges,
-        std::vector<WeightType> weights);
+  Graph(const std::vector<ValueType>& values,
+        const std::vector<std::pair<int, int>>& edges,
+        const std::vector<WeightType>& weights);
 
   void add_edge(int id1, int id2, WeightType weight);
 
@@ -48,8 +49,8 @@ public:
   friend std::ostream& operator<<(std::ostream& Str,
       const Graph<ValueType,WeightType,is_directed>& v) {
     for (int i = 0; i < v.nodes.size(); i++) {
-      Str << v.nodes[i]->value << ": ";
-      for (auto neighbor : v.nodes[i]->neighbors) {
+      Str << v.nodes[i].value << ": ";
+      for (auto neighbor : v.nodes[i].neighbors) {
         Str << neighbor->value << " ";
       }
       Str << std::endl;
@@ -57,7 +58,7 @@ public:
     return Str;
   }
 
-  std::vector<std::unique_ptr<Node<ValueType,WeightType>>> nodes;
+  std::vector<Node<ValueType,WeightType>> nodes;
 };
 
 } // namespace graph_utils

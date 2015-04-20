@@ -6,24 +6,25 @@
 
 namespace min_st_cut {
 
-template<typename ValueType>
+template<typename ValueType, typename EdgeType>
 class MinCutEdge {
  public:
-  MinCutEdge(graph_utils::Node<ValueType, max_flow::EdgeCapacity>* from,
-      graph_utils::Node<ValueType, max_flow::EdgeCapacity>* to,
-      max_flow::EdgeCapacity edge)
+  MinCutEdge(
+      graph_utils::Node<ValueType, max_flow::EdgeCapacity<EdgeType>>* from,
+      graph_utils::Node<ValueType, max_flow::EdgeCapacity<EdgeType>>* to,
+      max_flow::EdgeCapacity<EdgeType> edge)
     : from(from), to(to), edge(edge) { }
 
-  graph_utils::Node<ValueType, max_flow::EdgeCapacity>* from;
-  graph_utils::Node<ValueType, max_flow::EdgeCapacity>* to;
-  max_flow::EdgeCapacity edge;
+  graph_utils::Node<ValueType, max_flow::EdgeCapacity<EdgeType>>* from;
+  graph_utils::Node<ValueType, max_flow::EdgeCapacity<EdgeType>>* to;
+  max_flow::EdgeCapacity<EdgeType> edge;
 };
 
 // Computes the minimum st cut of an undirected graph.
 // Returns edges on the minimum st cut.
-template<typename ValueType>
-vector<MinCutEdge<ValueType>> compute_min_st_cut(
-    graph_utils::Graph<ValueType,max_flow::EdgeCapacity,false>* g); 
+template<typename ValueType, typename EdgeType>
+vector<MinCutEdge<ValueType, EdgeType>> compute_min_st_cut(
+    graph_utils::Graph<ValueType,max_flow::EdgeCapacity<EdgeType>,false>* g); 
 
 } // namespace min_st_cut
 

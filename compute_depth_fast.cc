@@ -37,6 +37,8 @@ void DepthComputerFast::initialize_cost(int row) {
   //             4  | 400
   //             5  | 500
   //
+  // TODO(daddy): Maybe factor this out into smaller functions. Too lazy
+  // right now.
   for (auto i = 0; i < right_cols; i++) {
     auto col_index = 0;
     if (i <= max_disparity_+1) {
