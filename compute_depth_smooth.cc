@@ -130,8 +130,11 @@ graph_utils::Graph<GraphCutEnergyMinimizer::PixelMetadata,
       int pixel_depth = depth_map->at<uchar>(row_index, col_index, 0);
       int pixel_id = row_col_to_node_id(row_index, col_index, depth_map->cols);
 
+      // TODO(daddy): Implement occlusions properly. Right now a pixel is
+      // occluded if its disparity is zero, which is trash.
       if (col_index + pixel_depth >= image_right_.cols ||
-          col_index + alpha_expansion_depth >= image_right_.cols) {
+          col_index + alpha_expansion_depth >= image_right_.cols ||
+          pixel_depth == 0) { // <-- TODO!!!
         continue;
       }
 
@@ -158,7 +161,7 @@ graph_utils::Graph<GraphCutEnergyMinimizer::PixelMetadata,
             EdgeCapacity<EdgeMetadata>(
                 pixel_source_cost, EdgeMetadata(EdgeType::PixelToSource)));
       }
-      
+
       if (pixel_depth == alpha_expansion_depth) {
         // If the pixel's depth is alpha, we create an edge with infinite cost
         // between the pixel and the sink (the sink is our non-alpha node).
@@ -181,7 +184,6 @@ graph_utils::Graph<GraphCutEnergyMinimizer::PixelMetadata,
       }
     }
   }
-  LOG0("Number of nodes: " << pixels.size());
 
   return graph_utils::Graph<PixelMetadata, EdgeCapacity<EdgeMetadata>, false>
       (pixels, pixel_connections, pixel_weights);
@@ -189,7 +191,7 @@ graph_utils::Graph<GraphCutEnergyMinimizer::PixelMetadata,
 
 double GraphCutEnergyMinimizer::compute_optimal_alpha_expansion(
     int alpha_expansion_depth, const unique_ptr<Mat>& depth_map) {
-  
+
   // Construct the graph that. This will be a graph whose min-cut corresponds
   // to an alpha-expansion that minimzes the energy function.
   graph_utils::Graph<
@@ -203,18 +205,38 @@ double GraphCutEnergyMinimizer::compute_optimal_alpha_expansion(
       min_st_cut::compute_min_st_cut<PixelMetadata, EdgeMetadata>(
           &expansion_graph); 
 
-  int counts[EdgeType::NUM_EDGE_TYPES];
+  // TODO(daddy): Consider making it NOT modify the depth map.
+  int count = 0;
+  for (auto i = 0U; i < min_st_cut.size(); i++) {
+    min_st_cut::MinCutEdge<PixelMetadata, EdgeMetadata> edge =
+        min_st_cut[i];
+    if (edge.edge.edge_data.edge_type == EdgeType::PixelToSource) {
+      int pixel_row = edge.from->value.row;
+      int pixel_col = edge.from->value.col;
+      if (pixel_row == -1) {
+        pixel_row = edge.to->value.row;
+        pixel_col = edge.to->value.col;
+      }
+      depth_map->at<uchar>(pixel_row, pixel_col) = alpha_expansion_depth;
+      count++;
+    }
+  }
+
+  #ifdef LOG_LEVEL_3
+  int counts[EdgeType::NUM_EDGE_TYPES] = {};
   for (auto i = 0U; i < min_st_cut.size(); i++) {
     counts[min_st_cut[i].edge.edge_data.edge_type]++;
   }
 
-  LOG0("PixelToSource: " << counts[EdgeType::PixelToSource]);
-  LOG0("PixelToSink: " << counts[EdgeType::PixelToSink]);
-  LOG0("PixelToMid: " << counts[EdgeType::PixelToMid]);
-  LOG0("PixelToPixel: " << counts[EdgeType::PixelToPixel]);
-  LOG0("MidToSink: " << counts[EdgeType::MidToSink]);
-  LOG0("InfiniteAlphaLink: " << counts[EdgeType::InfiniteAlphaLink]);
+  LOG3("PixelToSource: " << counts[EdgeType::PixelToSource]);
+  LOG3("PixelToSink: " << counts[EdgeType::PixelToSink]);
+  LOG3("PixelToMid: " << counts[EdgeType::PixelToMid]);
+  LOG3("PixelToPixel: " << counts[EdgeType::PixelToPixel]);
+  LOG3("MidToSink: " << counts[EdgeType::MidToSink]);
+  LOG3("InfiniteAlphaLink: " << counts[EdgeType::InfiniteAlphaLink]);
+  #endif
 
+  LOG0("Changed " << count << " pixels to " << alpha_expansion_depth);
   return 0.0;
 }
 
@@ -225,7 +247,10 @@ unique_ptr<Mat> GraphCutEnergyMinimizer::compute_depth_for_images() {
       pointwise_error_, occlusion_penalty_, max_disparity_);
   unique_ptr<Mat> depth_map(comp.compute_depth_for_images());
 
-  compute_optimal_alpha_expansion(10, depth_map);
+  for (int i = 1; i < max_disparity_; i++) {
+    LOG0("Computing alpha-expansion for alpha = " << i);
+    compute_optimal_alpha_expansion(i, depth_map);
+  }
 
   return depth_map;
 }

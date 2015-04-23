@@ -92,7 +92,7 @@ static double piecewise_smooth(int depth_1, int depth_2) {
   if (depth_1 == depth_2) {
     return 0.0;
   }
-  return 100;
+  return 1000;
 }
 
 }

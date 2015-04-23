@@ -159,7 +159,6 @@ unique_ptr<Mat> DepthComputerFast::compute_depth_for_images() {
         disparity = 0;
       }
       assert(disparity <= max_disparity_);
-      disparity = disparity * 255 / max_disparity_;
       depth_map->at<uchar>(current_row, current_col, 0) = disparity;
     }
   }

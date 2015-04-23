@@ -1,3 +1,6 @@
+clang++ -std=c++11 max_flow_test.cc
+echo "Running max_flow tests..."
+./a.out
 echo "Compiling graph_utils_test..."
 clang++ -std=c++11 graph_utils_test.cc -lopencv_imgproc -lopencv_core -lopencv_highgui -DLOG_LEVEL_0
 echo "Running graph_utils_test..."
@@ -9,9 +12,6 @@ echo "Running image_utils_test..."
 echo "Running compute_depth_fast..."
 clang++ -std=c++11 image_utils.cc compute_depth_fast.cc compute_depth_fast_test.cc -lopencv_imgproc -lopencv_core -lopencv_highgui -DLOG_LEVEL_0
 echo "Running compute_depth_fast tests..."
-./a.out
-clang++ -std=c++11 max_flow_test.cc
-echo "Running max_flow tests..."
 ./a.out
 clang++ -std=c++11 min_st_cut_test.cc -DLOG_LEVEL_0
 ./a.out

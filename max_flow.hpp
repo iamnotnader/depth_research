@@ -5,6 +5,7 @@
 #include <limits>
 #include <algorithm>
 #include "logging_utils.h"
+#include <unordered_set>
 
 namespace max_flow {
 
@@ -30,54 +31,94 @@ EdgeCapacity<EdgeType>* get_edge_between(
 }
 
 template<typename ValueType, typename EdgeType>
-bool path_contains_node(
-    const vector<Node<ValueType,EdgeCapacity<EdgeType>>*>& path,
+bool visited_contains_node(
+    std::unordered_set<Node<ValueType,EdgeCapacity<EdgeType>>*>& visited,
     Node<ValueType,EdgeCapacity<EdgeType>>* node) {
+  if (visited.find(node) != visited.end()) {
+    return true;
+  }
+  return false;
+}
 
+template<typename ValueType, typename EdgeType>
+bool find_augmenting_path_random_dfs(
+    Node<ValueType,EdgeCapacity<EdgeType>>* source,
+    Node<ValueType,EdgeCapacity<EdgeType>>* sink,
+    vector<Node<ValueType,EdgeCapacity<EdgeType>>*>* path,
+    std::unordered_set<Node<ValueType,EdgeCapacity<EdgeType>>*>* visited) {
   typedef Node<ValueType,EdgeCapacity<EdgeType>> NODE;
-  for (const NODE* n : path) {
-    if (n == node) {
-      return true;
+  if (source == nullptr || sink == nullptr) {
+    return false;
+  }
+  path->push_back(source);
+  visited->insert(source);
+  if (source == sink) {
+    return true;
+  }
+  vector<NODE*>& neighbors = const_cast<vector<NODE*>&>(source->neighbors);
+  const vector<EdgeCapacity<EdgeType>>& weights = source->weights; 
+  vector<int> indices;
+  for (int i = 0; i < neighbors.size(); i++) {
+    indices.push_back(i);
+  }
+
+  // Always trying to visit the sink first provides a small speed-up.
+  for (size_t i = 0; i < neighbors.size(); i++) {
+      if (neighbors[i]->id != 1) {
+        continue;
+      }
+      if (weights[i].residual() > 0) {
+        bool is_augmenting_path = find_augmenting_path_random_dfs(
+                                      neighbors[i], sink, path, visited);
+        if (is_augmenting_path) {
+          return true;
+        }
+      }
+  }
+  // Visiting nodes in random order provides a huge speed-up.
+  static unsigned long x=123456789, y=362436069, z=521288629;
+  auto fast_random = [](int i) { 
+    unsigned long t;
+    x ^= x << 16;
+    x ^= x >> 5;
+    x ^= x << 1;
+
+    t = x;
+    x = y;
+    y = z;
+    z = t ^ x ^ y;
+
+    return z % i;
+  };
+  std::random_shuffle(indices.begin(), indices.end(), fast_random);
+  for (size_t p = 0; p < indices.size(); p++) {
+    int i = indices[p];
+    if (weights[i].residual() > 0 &&
+        !visited_contains_node(*visited, neighbors[i])) {
+      // explore this node
+      bool is_augmenting_path = find_augmenting_path_random_dfs(
+                                    neighbors[i], sink, path, visited);
+      if (is_augmenting_path) {
+        return true;
+      }
     }
   }
+  path->pop_back();
   return false;
 }
 
 // Tries to find an augmenting path. Puts the path in "path" and returns true
 // if an augmenting path exists. Otherwise, leaves "path" empty and returns
 // false.
-//
-// TODO(daddy): Consider using bfs instead of dfs, since its choice of
-// augmenting path tends to lead to fewer iterations. Also recursion is
-// not as performant.
 template<typename ValueType, typename EdgeType>
 bool find_augmenting_path(
     Node<ValueType,EdgeCapacity<EdgeType>>* source,
     Node<ValueType,EdgeCapacity<EdgeType>>* sink,
     vector<Node<ValueType,EdgeCapacity<EdgeType>>*>* path) {
-
   typedef Node<ValueType,EdgeCapacity<EdgeType>> NODE;
-  if (source == nullptr || sink == nullptr) {
-    return false;
-  }
-  path->push_back(source);
-  if (source == sink) {
-    return true;
-  }
-  const vector<NODE*>& neighbors = source->neighbors;
-  const vector<EdgeCapacity<EdgeType>>& weights = source->weights; 
-  for (int i = 0; i < neighbors.size(); i++) {
-    if (weights[i].residual() > 0 &&
-        !path_contains_node(*path, neighbors[i])) {
-      // explore this node
-      bool is_augmenting_path = find_augmenting_path(neighbors[i], sink, path);
-      if (is_augmenting_path) {
-        return true;
-      }
-    } 
-  }
-  path->pop_back();
-  return false;
+  std::unordered_set<NODE*> visited; 
+  return find_augmenting_path_random_dfs<ValueType, EdgeType>(
+      source, sink, path, &visited);
 }
 
 }

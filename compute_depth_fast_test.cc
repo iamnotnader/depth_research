@@ -15,7 +15,7 @@ bool TestSingleRowPointwise() {
   compute_depth_fast::DepthComputerFast comp(m1,m2,
       compute_depth_fast::pointwise_error, 100, 2);
   unique_ptr<Mat> depth_map(comp.compute_depth_for_images());
-  uchar expected_arr[4] = {255, 255, 0, 0};
+  uchar expected_arr[4] = {2, 2, 0, 0};
   cv::Mat expected_mat({1, 4, CV_8UC1, &expected_arr});
   if (!MatsAreEqual(expected_mat, *depth_map)) {
     cred("Failed: {2, 2, 0, 0} pointwise");
@@ -36,7 +36,7 @@ bool TestSingleRowCensus() {
   compute_depth_fast::DepthComputerFast comp(m1,m2,
       compute_depth_fast::census_error, .1, 2);
   unique_ptr<Mat> depth_map(comp.compute_depth_for_images());
-  uchar expected_arr[4] = {255, 255, 0, 0};
+  uchar expected_arr[4] = {2, 2, 0, 0};
   cv::Mat expected_mat({1, 4, CV_8UC1, &expected_arr});
   if (!MatsAreEqual(expected_mat, *depth_map)) {
     cred("Failed: {2, 2, 0, 0} census");
@@ -61,9 +61,9 @@ bool Test3x3Pointwise() {
   compute_depth_fast::DepthComputerFast comp(m1,m2,
       compute_depth_fast::pointwise_error, 100, 2);
   unique_ptr<Mat> depth_map_census(comp.compute_depth_for_images());
-  uchar expected_arr[9] = {0,127,0,
-                            0,127,0,
-                            127,127,0};
+  uchar expected_arr[9] = {0,1,0,
+                            0,1,0,
+                            1,1,0};
   cv::Mat expected_mat({3, 3, CV_8UC1, &expected_arr});
   if (!MatsAreEqual(expected_mat, *depth_map_census)) {
     cred("Failed: 3x3 pointwise");
