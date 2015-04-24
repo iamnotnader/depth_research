@@ -15,8 +15,8 @@ bool TestSingleRowPointwise() {
   compute_depth_fast::DepthComputerFast comp(m1,m2,
       compute_depth_fast::pointwise_error, 100, 2);
   unique_ptr<Mat> depth_map(comp.compute_depth_for_images());
-  uchar expected_arr[4] = {2, 2, 0, 0};
-  cv::Mat expected_mat({1, 4, CV_8UC1, &expected_arr});
+  int32_t expected_arr[4] = {2, 2, INT_MIN, INT_MIN};
+  cv::Mat expected_mat({1, 4, CV_32SC1, &expected_arr});
   if (!MatsAreEqual(expected_mat, *depth_map)) {
     cred("Failed: {2, 2, 0, 0} pointwise");
     LOG0("Expected: " << expected_mat << std::endl << "But got: " <<
@@ -36,15 +36,15 @@ bool TestSingleRowCensus() {
   compute_depth_fast::DepthComputerFast comp(m1,m2,
       compute_depth_fast::census_error, .1, 2);
   unique_ptr<Mat> depth_map(comp.compute_depth_for_images());
-  uchar expected_arr[4] = {2, 2, 0, 0};
-  cv::Mat expected_mat({1, 4, CV_8UC1, &expected_arr});
+  int32_t expected_arr[4] = {2, 2, INT_MIN, INT_MIN};
+  cv::Mat expected_mat({1, 4, CV_32SC1, &expected_arr});
   if (!MatsAreEqual(expected_mat, *depth_map)) {
-    cred("Failed: {2, 2, 0, 0} census");
+    cred("Failed: {2, 2, INT_MIN, INT_MIN} census");
     LOG0("Expected: " << expected_mat << std::endl << "But got: " <<
         *depth_map);
     return false;
   } else {
-    cgreen("PASSED: {2, 2, 0, 0} census") << std::endl;
+    cgreen("PASSED: {2, 2, INT_MIN, INT_MIN} census") << std::endl;
   }
   return true;
 }
@@ -61,10 +61,10 @@ bool Test3x3Pointwise() {
   compute_depth_fast::DepthComputerFast comp(m1,m2,
       compute_depth_fast::pointwise_error, 100, 2);
   unique_ptr<Mat> depth_map_census(comp.compute_depth_for_images());
-  uchar expected_arr[9] = {0,1,0,
-                            0,1,0,
-                            1,1,0};
-  cv::Mat expected_mat({3, 3, CV_8UC1, &expected_arr});
+  int32_t expected_arr[9] = {0,1,INT_MIN,
+                            0,1,INT_MIN,
+                            1,1,INT_MIN};
+  cv::Mat expected_mat({3, 3, CV_32SC1, &expected_arr});
   if (!MatsAreEqual(expected_mat, *depth_map_census)) {
     cred("Failed: 3x3 pointwise");
     LOG0("Expected: " << expected_mat << std::endl << "But got: " <<

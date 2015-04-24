@@ -1,6 +1,7 @@
 #include "compute_depth_smooth.h"
 #include "compute_depth_fast.h"
 #include "logging_utils.h"
+#include "image_utils.h"
 
 int main() {
   LOG0("Running compute_depth_smooth tests...");
@@ -13,15 +14,12 @@ int main() {
       compute_depth_fast::pointwise_error, compute_depth_smooth::piecewise_smooth,
       1000, MAX_DISPARITY);
   std::unique_ptr<cv::Mat> depth_map(comp.compute_depth_for_images());
-  for (int i = 0; i < depth_map->rows; i++) {
-    for (int j = 0; j < depth_map->cols; j++) {
-      depth_map->at<uchar>(i, j, 0) = depth_map->at<uchar>(i, j, 0) * 255 / MAX_DISPARITY;
-    }
-  }
+  cv::Mat img_depth_map_graph = image_utils::convert_to_uchar_image(*depth_map);
+  image_utils::normalize_depth_map(&img_depth_map_graph, MAX_DISPARITY);
 
   // Display the computed depth map.
   namedWindow("Depth Map", cv::WINDOW_AUTOSIZE);
-  imshow("Depth Map", *depth_map);
+  imshow("Depth Map", img_depth_map_graph);
 
   cv::waitKey();
 

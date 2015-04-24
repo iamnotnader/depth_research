@@ -37,6 +37,10 @@ typedef std::function<std::vector<double>(const cv::Mat& window)> WINDOW_FUNC;
 status_defs::Status ApplyWindowFunctionToImage(const cv::Mat& image_in,
     cv::Mat* image_out, WINDOW_FUNC func, int window_width, int window_height);
 
+cv::Mat convert_to_uchar_image(const cv::Mat& m);
+
+void normalize_depth_map(cv::Mat* img_depth_map, int max_depth);
+
 } // namespace image_utils
 
 #endif

@@ -201,5 +201,27 @@ status_defs::Status ApplyWindowFunctionToImage(const cv::Mat& image_in,
   return status_defs::Status::SUCCESS;
 }
 
+cv::Mat convert_to_uchar_image(const Mat& m) {
+  cv::Mat img_depth_map(m.rows, m.cols, CV_8UC1);
+  for (int i = 0; i < img_depth_map.rows; i++) {
+    for (int j = 0; j < img_depth_map.cols; j++) {
+      if (m.at<int32_t>(i, j, 0) == INT_MIN) {
+        img_depth_map.at<uchar>(i, j, 0) = 0;
+      }
+      img_depth_map.at<uchar>(i, j, 0) = m.at<int32_t>(i, j, 0);
+    }
+  }
+  return img_depth_map;
+}
+
+void normalize_depth_map(cv::Mat* img_depth_map, int max_depth) {
+  for (int i = 0; i < img_depth_map->rows; i++) {
+    for (int j = 0; j < img_depth_map->cols; j++) {
+      img_depth_map->at<uchar>(i, j, 0) =
+          img_depth_map->at<uchar>(i, j, 0) * 255 / max_depth;
+    }
+  }
+}
+
 } // namespace image_utils
 

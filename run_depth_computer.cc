@@ -2,6 +2,7 @@
 #include <iostream>
 #include "compute_depth_fast.h"
 #include "logging_utils.h"
+#include "image_utils.h"
 
 using cv::imshow;
 using cv::Mat;
@@ -22,6 +23,8 @@ int main(int argc, char** argv) {
       compute_depth_fast::pointwise_error,
       1000, 100);
   unique_ptr<Mat> depth_map(comp2.compute_depth_for_images());
+  cv::Mat img_depth_map = image_utils::convert_to_uchar_image(*depth_map);
+  image_utils::normalize_depth_map(&img_depth_map, 100);
 
   // Display the two input images.
   namedWindow("Left Image", cv::WINDOW_AUTOSIZE);
@@ -34,7 +37,7 @@ int main(int argc, char** argv) {
 
   // Display the computed depth map.
   namedWindow("Depth Map", cv::WINDOW_AUTOSIZE);
-  imshow("Depth Map", *depth_map);
+  imshow("Depth Map", img_depth_map);
 
   cv::waitKey();
   return 0;

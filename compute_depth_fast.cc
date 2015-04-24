@@ -113,7 +113,7 @@ vector<int> DepthComputerFast::compute_correspondence_for_line(int row) {
   initialize_cost(row);
   int right_pixel = right_cols-1;
   int left_pixel = max_disparity_+1;
-  vector<int> ret;
+  vector<int32_t> ret;
   while (ret.size() < (unsigned long)image_left_.cols) {
     switch(get_previous_move(right_pixel, left_pixel)) {
       case PreviousMove::Match: {
@@ -121,7 +121,7 @@ vector<int> DepthComputerFast::compute_correspondence_for_line(int row) {
         right_pixel--;
         break;
       } case PreviousMove::OccludeLeft: {
-        ret.push_back(-1);
+        ret.push_back(OCCLUSION_DEPTH);
         left_pixel--;
         break;
       } case PreviousMove::OccludeRight: {
@@ -147,19 +147,19 @@ vector<int> DepthComputerFast::compute_correspondence_for_line(int row) {
 unique_ptr<Mat> DepthComputerFast::compute_depth_for_images() {
   LOG2("Called.");
   unique_ptr<Mat> depth_map(new Mat(image_left_.rows, image_left_.cols,
-      CV_8UC1));
+      CV_32SC1));
   for (int current_row = 0; current_row < image_left_.rows; current_row++) {
     LOG2(current_row*100/image_left_.rows << "%");
     vector<int> correspondences =
         compute_correspondence_for_line(current_row);
     for (int current_col = 0; current_col < image_left_.cols; current_col++) {
       // Try reversing the pictures to prevent this from happening.
-      int disparity = correspondences[current_col] - current_col;
-      if (disparity < 0) {
-        disparity = 0;
+      int disparity = OCCLUSION_DEPTH;
+      if (correspondences[current_col] != OCCLUSION_DEPTH) {
+        disparity = correspondences[current_col] - current_col; 
       }
       assert(disparity <= max_disparity_);
-      depth_map->at<uchar>(current_row, current_col, 0) = disparity;
+      depth_map->at<int32_t>(current_row, current_col, 0) = disparity;
     }
   }
   return std::move(depth_map);

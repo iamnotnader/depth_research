@@ -7,6 +7,7 @@
 using std::unique_ptr;
 using cv::Mat;
 using max_flow::EdgeCapacity;
+using compute_depth_fast::OCCLUSION_DEPTH;
 
 namespace compute_depth_smooth {
 
@@ -37,8 +38,8 @@ void GraphCutEnergyMinimizer::connect_pixel_to_neighbor(
     return;
   }
 
-  int from_pixel_depth = depth_map->at<uchar>(from_row, from_col, 0);
-  int to_pixel_depth = depth_map->at<uchar>(to_row, to_col, 0);
+  int from_pixel_depth = depth_map->at<int32_t>(from_row, from_col, 0);
+  int to_pixel_depth = depth_map->at<int32_t>(to_row, to_col, 0);
 
   int from_id = row_col_to_node_id(from_row, from_col, depth_map->cols);
   int to_id = row_col_to_node_id(to_row, to_col, depth_map->cols);
@@ -81,22 +82,6 @@ void GraphCutEnergyMinimizer::connect_pixel_to_neighbor(
   }
 }
 
-void GraphCutEnergyMinimizer::normalize_depth_map(cv::Mat* depth_map) {
-  assert(depth_map->type() == CV_8UC1);
-  for (int row_index = 0; row_index < depth_map->rows; row_index++) {
-    for (int col_index = 0; col_index < depth_map->cols; col_index++) {
-      uchar disparity = depth_map->at<uchar>(row_index, col_index, 0);
-      if (disparity < 0) {
-        disparity = 0;
-      }
-      assert(disparity <= max_disparity_);
-      depth_map->at<uchar>(row_index, col_index, 0) =
-          disparity * 255 / max_disparity_;
-    }
-  }
-}
-
-
 graph_utils::Graph<GraphCutEnergyMinimizer::PixelMetadata,
                    EdgeCapacity<GraphCutEnergyMinimizer::EdgeMetadata>,
                    false>
@@ -113,8 +98,8 @@ graph_utils::Graph<GraphCutEnergyMinimizer::PixelMetadata,
   for (int row_index = 0; row_index < depth_map->rows; row_index++) {
     for (int col_index = 0; col_index < depth_map->cols; col_index++) {
       pixels.push_back(PixelMetadata(row_index, col_index,
-                       depth_map->at<uchar>(row_index, col_index, 0)));      
-      if (depth_map->at<uchar>(row_index, col_index, 0) == alpha_expansion_depth) {
+                       depth_map->at<int32_t>(row_index, col_index, 0)));      
+      if (depth_map->at<int32_t>(row_index, col_index, 0) == alpha_expansion_depth) {
         num_alpha_pixels++;
       }
     }
@@ -127,14 +112,14 @@ graph_utils::Graph<GraphCutEnergyMinimizer::PixelMetadata,
   vector<EdgeCapacity<EdgeMetadata>> pixel_weights;
   for (int row_index = 0; row_index < depth_map->rows; row_index++) {
     for (int col_index = 0; col_index < depth_map->cols; col_index++) {
-      int pixel_depth = depth_map->at<uchar>(row_index, col_index, 0);
+      int pixel_depth = depth_map->at<int32_t>(row_index, col_index, 0);
       int pixel_id = row_col_to_node_id(row_index, col_index, depth_map->cols);
 
-      // TODO(daddy): Implement occlusions properly. Right now a pixel is
-      // occluded if its disparity is zero, which is trash.
-      if (col_index + pixel_depth >= image_right_.cols ||
-          col_index + alpha_expansion_depth >= image_right_.cols ||
-          pixel_depth == 0) { // <-- TODO!!!
+      if ((col_index + pixel_depth >= image_right_.cols ||
+           col_index + alpha_expansion_depth >= image_right_.cols ||
+           col_index + pixel_depth < 0 ||
+           pixel_depth == 0) &&
+          pixel_depth != OCCLUSION_DEPTH) {
         continue;
       }
 
@@ -154,8 +139,11 @@ graph_utils::Graph<GraphCutEnergyMinimizer::PixelMetadata,
         // Connect pixel to source. The source node is our "alpha" node and
         // cutting the edge between it and the pixel corresponds to assigning
         // the pixel a depth of alpha.
-        double pixel_source_cost = pointwise_error_(image_left_, image_right_,
-          row_index, col_index, row_index, col_index + alpha_expansion_depth);
+        double pixel_source_cost = occlusion_penalty_;
+        if (alpha_expansion_depth != OCCLUSION_DEPTH) {
+            pixel_source_cost = pointwise_error_(image_left_, image_right_,
+                row_index, col_index, row_index, col_index + alpha_expansion_depth);
+        }
         pixel_connections.push_back(pair<int,int>(pixel_id, SOURCE_ID));
         pixel_weights.push_back(
             EdgeCapacity<EdgeMetadata>(
@@ -175,8 +163,11 @@ graph_utils::Graph<GraphCutEnergyMinimizer::PixelMetadata,
         // Otherwise, the edge cost is the pointwise cost of giving pixel the
         // depth it previously had. Cutting the edge between the sink and the
         // pixel corresponds to leaving the depth of the pixel unchanged.
-        double pixel_sink_cost = pointwise_error_(image_left_, image_right_,
-            row_index, col_index, row_index, col_index + pixel_depth);
+        double pixel_sink_cost = occlusion_penalty_;
+        if (pixel_depth != OCCLUSION_DEPTH) {
+          pixel_sink_cost = pointwise_error_(image_left_, image_right_,
+              row_index, col_index, row_index, col_index + pixel_depth);
+        }
         pixel_connections.push_back(pair<int,int>(pixel_id, SINK_ID));
         pixel_weights.push_back(
             EdgeCapacity<EdgeMetadata>(
@@ -217,7 +208,7 @@ double GraphCutEnergyMinimizer::compute_optimal_alpha_expansion(
         pixel_row = edge.to->value.row;
         pixel_col = edge.to->value.col;
       }
-      depth_map->at<uchar>(pixel_row, pixel_col) = alpha_expansion_depth;
+      depth_map->at<int32_t>(pixel_row, pixel_col, 0) = alpha_expansion_depth;
       count++;
     }
   }
@@ -247,7 +238,20 @@ unique_ptr<Mat> GraphCutEnergyMinimizer::compute_depth_for_images() {
       pointwise_error_, occlusion_penalty_, max_disparity_);
   unique_ptr<Mat> depth_map(comp.compute_depth_for_images());
 
-  for (int i = 1; i < max_disparity_; i++) {
+  compute_optimal_alpha_expansion(OCCLUSION_DEPTH, depth_map);
+  for (int i = max_disparity_-1; i >= 0; i--) {
+    LOG0("Computing alpha-expansion for alpha = " << i);
+    compute_optimal_alpha_expansion(i, depth_map);
+  }
+  
+  compute_optimal_alpha_expansion(OCCLUSION_DEPTH, depth_map);
+  for (int i = 0; i < max_disparity_; i++) {
+    LOG0("Computing alpha-expansion for alpha = " << i);
+    compute_optimal_alpha_expansion(i, depth_map);
+  }
+
+  compute_optimal_alpha_expansion(OCCLUSION_DEPTH, depth_map);
+  for (int i = max_disparity_-1; i >= 0; i--) {
     LOG0("Computing alpha-expansion for alpha = " << i);
     compute_optimal_alpha_expansion(i, depth_map);
   }

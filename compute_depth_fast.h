@@ -7,6 +7,8 @@
 
 namespace compute_depth_fast {
 
+static const int OCCLUSION_DEPTH = INT_MIN;
+
 typedef std::function<double(const cv::Mat&,const cv::Mat&, int,int,int,int)>
     ErrorFunc;
 
