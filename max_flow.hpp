@@ -5,7 +5,6 @@
 #include <limits>
 #include <algorithm>
 #include "logging_utils.h"
-#include <unordered_set>
 
 namespace max_flow {
 
@@ -31,27 +30,17 @@ EdgeCapacity<EdgeType>* get_edge_between(
 }
 
 template<typename ValueType, typename EdgeType>
-bool visited_contains_node(
-    std::unordered_set<Node<ValueType,EdgeCapacity<EdgeType>>*>& visited,
-    Node<ValueType,EdgeCapacity<EdgeType>>* node) {
-  if (visited.find(node) != visited.end()) {
-    return true;
-  }
-  return false;
-}
-
-template<typename ValueType, typename EdgeType>
 bool find_augmenting_path_random_dfs(
     Node<ValueType,EdgeCapacity<EdgeType>>* source,
     Node<ValueType,EdgeCapacity<EdgeType>>* sink,
     vector<Node<ValueType,EdgeCapacity<EdgeType>>*>* path,
-    std::unordered_set<Node<ValueType,EdgeCapacity<EdgeType>>*>* visited) {
+    vector<bool>& visited) {
   typedef Node<ValueType,EdgeCapacity<EdgeType>> NODE;
   if (source == nullptr || sink == nullptr) {
     return false;
   }
   path->push_back(source);
-  visited->insert(source);
+  visited[source->id] = true;
   if (source == sink) {
     return true;
   }
@@ -94,7 +83,7 @@ bool find_augmenting_path_random_dfs(
   for (size_t p = 0; p < indices.size(); p++) {
     int i = indices[p];
     if (weights[i].residual() > 0 &&
-        !visited_contains_node(*visited, neighbors[i])) {
+        !visited[neighbors[i]->id]) {
       // explore this node
       bool is_augmenting_path = find_augmenting_path_random_dfs(
                                     neighbors[i], sink, path, visited);
@@ -114,11 +103,12 @@ template<typename ValueType, typename EdgeType>
 bool find_augmenting_path(
     Node<ValueType,EdgeCapacity<EdgeType>>* source,
     Node<ValueType,EdgeCapacity<EdgeType>>* sink,
-    vector<Node<ValueType,EdgeCapacity<EdgeType>>*>* path) {
+    vector<Node<ValueType,EdgeCapacity<EdgeType>>*>* path,
+    vector<bool>& visited) {
+  std::fill(visited.begin(), visited.end(), false);
   typedef Node<ValueType,EdgeCapacity<EdgeType>> NODE;
-  std::unordered_set<NODE*> visited; 
   return find_augmenting_path_random_dfs<ValueType, EdgeType>(
-      source, sink, path, &visited);
+      source, sink, path, visited);
 }
 
 }
@@ -133,11 +123,12 @@ double compute_max_flow(Graph<ValueType,EdgeCapacity<EdgeType>,false>* g) {
   NODE* sink = &nodes[1];
 
   vector<NODE*> path;
+  vector<bool> visited(nodes.size());
   while (true) {
     path.clear();
 
     bool exists_augmenting_path =
-      internal::find_augmenting_path<ValueType>(source, sink, &path);
+      internal::find_augmenting_path<ValueType>(source, sink, &path, visited);
 
     if (!exists_augmenting_path) {
       LOG3("Computing maximum flow by summing outflows from source.");

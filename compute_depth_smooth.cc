@@ -244,18 +244,6 @@ unique_ptr<Mat> GraphCutEnergyMinimizer::compute_depth_for_images() {
     compute_optimal_alpha_expansion(i, depth_map);
   }
   
-  compute_optimal_alpha_expansion(OCCLUSION_DEPTH, depth_map);
-  for (int i = 0; i < max_disparity_; i++) {
-    LOG0("Computing alpha-expansion for alpha = " << i);
-    compute_optimal_alpha_expansion(i, depth_map);
-  }
-
-  compute_optimal_alpha_expansion(OCCLUSION_DEPTH, depth_map);
-  for (int i = max_disparity_-1; i >= 0; i--) {
-    LOG0("Computing alpha-expansion for alpha = " << i);
-    compute_optimal_alpha_expansion(i, depth_map);
-  }
-
   return depth_map;
 }
 
