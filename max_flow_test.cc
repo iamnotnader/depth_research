@@ -1,11 +1,14 @@
 #include "max_flow.hpp"
 #include <iostream>
+#include "logging_utils.h"
 
 int main() {
   using namespace graph_utils;
   using namespace max_flow;
   using std::vector;
   using std::pair;
+
+  logging_utils::print_stack_traces();
 
   cout << "Running max flow tests. Nodes are indexed. 0=source, 1=sink."
        << endl;

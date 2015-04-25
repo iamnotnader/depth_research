@@ -29,27 +29,79 @@ EdgeCapacity<EdgeType>* get_edge_between(
   return nullptr;
 }
 
-static vector<int> random_indices(int N) {
-  vector<int> indices(N);
+static unsigned long x=123456789, y=362436069, z=521288629;
+auto fast_random = [](int i) { 
+  unsigned long t;
+  x ^= x << 16;
+  x ^= x >> 5;
+  x ^= x << 1;
+
+  t = x;
+  x = y;
+  y = z;
+  z = t ^ x ^ y;
+
+  return z % i;
+};
+
+static vector<int>* random_indices(int N) {
+  vector<int>* indices = new vector<int>(N);
   for (int i = 0; i < N; i++) {
-    indices[i] = i;
+    (*indices)[i] = i;
   }
-  static unsigned long x=123456789, y=362436069, z=521288629;
-  auto fast_random = [](int i) { 
-    unsigned long t;
-    x ^= x << 16;
-    x ^= x >> 5;
-    x ^= x << 1;
-
-    t = x;
-    x = y;
-    y = z;
-    z = t ^ x ^ y;
-
-    return z % i;
-  };
-  std::random_shuffle(indices.begin(), indices.end(), fast_random);
+  std::random_shuffle((*indices).begin(), (*indices).end(), fast_random);
   return indices;
+}
+
+// TODO(daddy): This is a really crappy way of getting around having to call
+// malloc and free constantly...
+class RandomVectorFactory {
+ public:
+  RandomVectorFactory() {}
+  
+  vector<int>* get_random_vector(int N) {
+    for (size_t i = 0; i < free_vector_lists.size(); i++) {
+      pair<int, vector<vector<int>*>>& lists = free_vector_lists[i];
+      if (lists.first == N) {
+        if (lists.second.size() > 0) {
+          vector<int>* ret = std::move(lists.second.back());
+          lists.second.pop_back();
+          return std::move(ret);
+        }
+        break;
+      }
+    }
+    return random_indices(N);
+  }
+
+  // Takes ownership of vec_to_free.
+  void free_vector(vector<int>* vec_to_free) {
+    std::random_shuffle(vec_to_free->begin(), vec_to_free->end(), fast_random);
+    for (size_t i = 0; i < free_vector_lists.size(); i++) {
+      pair<int, vector<vector<int>*>>& lists = free_vector_lists[i];
+      if (lists.first == (int)(vec_to_free->size())) {
+        free_vector_lists[i].second.push_back(std::move(vec_to_free));
+        return;
+      }
+    }
+    vector<vector<int>*> my_vecs({vec_to_free});
+    free_vector_lists.push_back({vec_to_free->size(), std::move(my_vecs)});
+  }
+
+  private:
+   vector<pair<int, vector<vector<int>*>>> free_vector_lists;
+};
+
+struct dfs_stack_context {
+  vector<int>* indices;
+  int current_index;
+};
+
+static void free_dfs_stack(vector<dfs_stack_context>* dfs_stack,
+                    RandomVectorFactory* vec_factory) {
+  for (auto& ctx : *dfs_stack) {
+    vec_factory->free_vector(std::move(ctx.indices));
+  }
 }
 
 template<typename ValueType, typename EdgeType>
@@ -60,22 +112,21 @@ bool find_augmenting_path_random_dfs(
     vector<bool>& visited) {
   typedef Node<ValueType,EdgeCapacity<EdgeType>> NODE;
 
+  static RandomVectorFactory vec_factory;
   if (source == nullptr || sink == nullptr) {
     return false;
   }
 
-  struct dfs_stack_context {
-    vector<int> indices;
-    int current_index;
-  };
   vector<dfs_stack_context> dfs_stack;
   visited[source->id] = true;
-  dfs_stack.push_back({random_indices(source->neighbors.size()), 0});
+  dfs_stack.push_back({
+      vec_factory.get_random_vector(source->neighbors.size()), 0});
   path->push_back(source);
   while (!dfs_stack.empty()) {
     assert(dfs_stack.size() == path->size());
     NODE* current_node = path->back();
     if (current_node == sink) {
+      free_dfs_stack(&dfs_stack, &vec_factory);
       return true;
     }
 
@@ -85,20 +136,21 @@ bool find_augmenting_path_random_dfs(
 
     // Always trying to visit the sink first provides a small speed-up.
     if (!visited[sink->id]) {
-      for (int ind = ctx.current_index; ind < ctx.indices.size(); ind++) {
-          int i = ctx.indices[ind];
+      for (size_t ind = ctx.current_index; ind < ctx.indices->size(); ind++) {
+          int i = (*ctx.indices)[ind];
           if (neighbors[i]->id != sink->id) {
             continue;
           }
           if (weights[i].residual() > 0) {
+            free_dfs_stack(&dfs_stack, &vec_factory);
             path->push_back(neighbors[i]);
             return true;
           }
       }
     }
 
-    for (; ctx.current_index < ctx.indices.size(); ctx.current_index++) {
-      int i = ctx.indices[ctx.current_index];
+    for (; ctx.current_index < (int)(ctx.indices->size()); (ctx.current_index)++) {
+      int i = (*ctx.indices)[ctx.current_index];
       NODE* next_node = neighbors[i];
       const EdgeCapacity<EdgeType>& weight_edge = weights[i];
       if (visited[next_node->id]) {
@@ -110,11 +162,13 @@ bool find_augmenting_path_random_dfs(
       // At this point, we have a useful neighbor that isn't the sink.
       // Mark as visited and push onto the stack.
       visited[next_node->id] = true;
-      dfs_stack.push_back({random_indices(next_node->neighbors.size()), 0});
+      dfs_stack.push_back({
+          vec_factory.get_random_vector(next_node->neighbors.size()), 0});
       path->push_back(next_node);
       break;
     }
-    if (ctx.current_index >= ctx.indices.size()) {
+    if (ctx.current_index >= (int)ctx.indices->size()) {
+      vec_factory.free_vector(std::move(dfs_stack.back().indices));
       dfs_stack.pop_back();
       path->pop_back();
       continue;
@@ -123,6 +177,7 @@ bool find_augmenting_path_random_dfs(
   if (dfs_stack.empty()) {
     return false;
   }
+  free_dfs_stack(&dfs_stack, &vec_factory);
   return true;
 }
 
