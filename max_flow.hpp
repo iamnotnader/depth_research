@@ -29,42 +29,11 @@ EdgeCapacity<EdgeType>* get_edge_between(
   return nullptr;
 }
 
-template<typename ValueType, typename EdgeType>
-bool find_augmenting_path_random_dfs(
-    Node<ValueType,EdgeCapacity<EdgeType>>* source,
-    Node<ValueType,EdgeCapacity<EdgeType>>* sink,
-    vector<Node<ValueType,EdgeCapacity<EdgeType>>*>* path,
-    vector<bool>& visited) {
-  typedef Node<ValueType,EdgeCapacity<EdgeType>> NODE;
-  if (source == nullptr || sink == nullptr) {
-    return false;
+static vector<int> random_indices(int N) {
+  vector<int> indices(N);
+  for (int i = 0; i < N; i++) {
+    indices[i] = i;
   }
-  path->push_back(source);
-  visited[source->id] = true;
-  if (source == sink) {
-    return true;
-  }
-  vector<NODE*>& neighbors = const_cast<vector<NODE*>&>(source->neighbors);
-  const vector<EdgeCapacity<EdgeType>>& weights = source->weights; 
-  vector<int> indices;
-  for (int i = 0; i < neighbors.size(); i++) {
-    indices.push_back(i);
-  }
-
-  // Always trying to visit the sink first provides a small speed-up.
-  for (size_t i = 0; i < neighbors.size(); i++) {
-      if (neighbors[i]->id != 1) {
-        continue;
-      }
-      if (weights[i].residual() > 0) {
-        bool is_augmenting_path = find_augmenting_path_random_dfs(
-                                      neighbors[i], sink, path, visited);
-        if (is_augmenting_path) {
-          return true;
-        }
-      }
-  }
-  // Visiting nodes in random order provides a huge speed-up.
   static unsigned long x=123456789, y=362436069, z=521288629;
   auto fast_random = [](int i) { 
     unsigned long t;
@@ -80,20 +49,81 @@ bool find_augmenting_path_random_dfs(
     return z % i;
   };
   std::random_shuffle(indices.begin(), indices.end(), fast_random);
-  for (size_t p = 0; p < indices.size(); p++) {
-    int i = indices[p];
-    if (weights[i].residual() > 0 &&
-        !visited[neighbors[i]->id]) {
-      // explore this node
-      bool is_augmenting_path = find_augmenting_path_random_dfs(
-                                    neighbors[i], sink, path, visited);
-      if (is_augmenting_path) {
-        return true;
+  return indices;
+}
+
+template<typename ValueType, typename EdgeType>
+bool find_augmenting_path_random_dfs(
+    Node<ValueType,EdgeCapacity<EdgeType>>* source,
+    Node<ValueType,EdgeCapacity<EdgeType>>* sink,
+    vector<Node<ValueType,EdgeCapacity<EdgeType>>*>* path,
+    vector<bool>& visited) {
+  typedef Node<ValueType,EdgeCapacity<EdgeType>> NODE;
+
+  if (source == nullptr || sink == nullptr) {
+    return false;
+  }
+
+  struct dfs_stack_context {
+    vector<int> indices;
+    int current_index;
+  };
+  vector<dfs_stack_context> dfs_stack;
+  visited[source->id] = true;
+  dfs_stack.push_back({random_indices(source->neighbors.size()), 0});
+  path->push_back(source);
+  while (!dfs_stack.empty()) {
+    assert(dfs_stack.size() == path->size());
+    NODE* current_node = path->back();
+    if (current_node == sink) {
+      return true;
+    }
+
+    dfs_stack_context ctx = dfs_stack.back();
+    const vector<NODE*>& neighbors = current_node->neighbors;
+    const vector<EdgeCapacity<EdgeType>>& weights = current_node->weights;
+
+    // Always trying to visit the sink first provides a small speed-up.
+    if (!visited[sink->id]) {
+      for (int ind = ctx.current_index; ind < ctx.indices.size(); ind++) {
+          int i = ctx.indices[ind];
+          if (neighbors[i]->id != sink->id) {
+            continue;
+          }
+          if (weights[i].residual() > 0) {
+            path->push_back(neighbors[i]);
+            return true;
+          }
       }
     }
+
+    for (; ctx.current_index < ctx.indices.size(); ctx.current_index++) {
+      int i = ctx.indices[ctx.current_index];
+      NODE* next_node = neighbors[i];
+      const EdgeCapacity<EdgeType>& weight_edge = weights[i];
+      if (visited[next_node->id]) {
+        continue;
+      }
+      if (weight_edge.residual() <= 0) {
+        continue;
+      }
+      // At this point, we have a useful neighbor that isn't the sink.
+      // Mark as visited and push onto the stack.
+      visited[next_node->id] = true;
+      dfs_stack.push_back({random_indices(next_node->neighbors.size()), 0});
+      path->push_back(next_node);
+      break;
+    }
+    if (ctx.current_index >= ctx.indices.size()) {
+      dfs_stack.pop_back();
+      path->pop_back();
+      continue;
+    }
   }
-  path->pop_back();
-  return false;
+  if (dfs_stack.empty()) {
+    return false;
+  }
+  return true;
 }
 
 // Tries to find an augmenting path. Puts the path in "path" and returns true

@@ -87,8 +87,8 @@ class GraphCutEnergyMinimizer {
 };
 
 static double piecewise_smooth(int depth_1, int depth_2) {
-  // TODO(daddy): Make it so the cost is 0 if the pixels are the same OR very
-  // different but nonzero when they're only slightly different.
+  // TODO(daddy): Make it so the cost is 0 if the pixels are the same OR have
+  // very different pointwise errors.
   if (depth_1 == depth_2) {
     return 0.0;
   }
