@@ -2,7 +2,7 @@
 #define BARRIER_COMPUTE_DEPTH_SMOOTH
 
 #include <utility>
-#include "max_flow.hpp"
+#include "max_flow.h"
 #include "opencv2/imgproc/imgproc.hpp"
 #include "opencv2/highgui/highgui.hpp"
 

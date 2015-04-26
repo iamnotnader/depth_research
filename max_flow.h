@@ -30,9 +30,12 @@ public:
 // Computes the maximum flow of an undirected graph.
 // Returns a graph with maximum flow for each edge by reference.
 template<typename ValueType, typename EdgeType>
-double compute_max_flow(
+class MaxFlowComputer {
+ public:
+  virtual double compute_max_flow(
     graph_utils::Graph<ValueType,
-    EdgeCapacity<EdgeType>,false>* g); 
+    EdgeCapacity<EdgeType>,false>* g) = 0;
+};
 
 } // namespace max_flow
 

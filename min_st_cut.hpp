@@ -69,7 +69,10 @@ vector<MinCutEdge<ValueType, EdgeType>> compute_min_st_cut(
   typedef graph_utils::Node<ValueType,max_flow::EdgeCapacity<EdgeType>> NODE;
   // First we compute the max flow for the graph. This sets the flow on all of
   // the edges properly.
-  max_flow::compute_max_flow<ValueType, EdgeType>(g);
+  //
+  //TODO(daddy): Migrate this over to MaxFlowComputerPushRelabel
+  max_flow::MaxFlowComputerFordFulkerson<ValueType, EdgeType> mfc;
+  mfc.compute_max_flow(g);
 
   auto& nodes = g->nodes;
   NODE* source = &nodes[0];

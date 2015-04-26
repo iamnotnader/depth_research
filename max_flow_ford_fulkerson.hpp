@@ -17,6 +17,8 @@ using graph_utils::Node;
 
 namespace internal { 
 
+static const int NEIGHBOR_CUTOFF = 10;
+
 template<typename ValueType, typename EdgeType>
 EdgeCapacity<EdgeType>* get_edge_between(
     Node<ValueType,EdgeCapacity<EdgeType>>* node_from,
@@ -95,14 +97,13 @@ class RandomVectorFactory {
 struct dfs_stack_context {
   vector<int>* indices;
   int current_index;
-};
-
-static void free_dfs_stack(vector<dfs_stack_context>* dfs_stack,
-                    RandomVectorFactory* vec_factory) {
-  for (auto& ctx : *dfs_stack) {
-    vec_factory->free_vector(std::move(ctx.indices));
+  static void free_dfs_stack(vector<dfs_stack_context>* dfs_stack,
+                      RandomVectorFactory* vec_factory) {
+    for (auto& ctx : *dfs_stack) {
+      vec_factory->free_vector(std::move(ctx.indices));
+    }
   }
-}
+};
 
 template<typename ValueType, typename EdgeType>
 bool find_augmenting_path_random_dfs(
@@ -126,7 +127,7 @@ bool find_augmenting_path_random_dfs(
     assert(dfs_stack.size() == path->size());
     NODE* current_node = path->back();
     if (current_node == sink) {
-      free_dfs_stack(&dfs_stack, &vec_factory);
+      dfs_stack_context::free_dfs_stack(&dfs_stack, &vec_factory);
       return true;
     }
 
@@ -134,15 +135,17 @@ bool find_augmenting_path_random_dfs(
     const vector<NODE*>& neighbors = current_node->neighbors;
     const vector<EdgeCapacity<EdgeType>>& weights = current_node->weights;
 
-    // Always trying to visit the sink first provides a small speed-up.
-    if (!visited[sink->id]) {
+    // Always trying to visit the sink first provides a small speed-up, but
+    // only if we do it for nodes with a small number of neighbors. We
+    // determined NEIGHBOR_CUTOFF empirically.
+    if (neighbors.size() < NEIGHBOR_CUTOFF) {
       for (size_t ind = ctx.current_index; ind < ctx.indices->size(); ind++) {
           int i = (*ctx.indices)[ind];
           if (neighbors[i]->id != sink->id) {
             continue;
           }
           if (weights[i].residual() > 0) {
-            free_dfs_stack(&dfs_stack, &vec_factory);
+            dfs_stack_context::free_dfs_stack(&dfs_stack, &vec_factory);
             path->push_back(neighbors[i]);
             return true;
           }
@@ -177,7 +180,7 @@ bool find_augmenting_path_random_dfs(
   if (dfs_stack.empty()) {
     return false;
   }
-  free_dfs_stack(&dfs_stack, &vec_factory);
+  dfs_stack_context::free_dfs_stack(&dfs_stack, &vec_factory);
   return true;
 }
 
@@ -196,12 +199,20 @@ bool find_augmenting_path(
       source, sink, path, visited);
 }
 
-}
+} // namespace internal
 
-// Computes the minimum cut of an undirected graph.
-// returns edges and weights by reference.
 template<typename ValueType, typename EdgeType>
-double compute_max_flow(Graph<ValueType,EdgeCapacity<EdgeType>,false>* g) {
+class MaxFlowComputerFordFulkerson :
+    public MaxFlowComputer<ValueType, EdgeType> {
+ public:
+  double compute_max_flow(
+      Graph<ValueType,EdgeCapacity<EdgeType>,false>* g) override;
+};
+
+// Computes the maximum flow of an undirected graph.
+template<typename ValueType, typename EdgeType>
+double MaxFlowComputerFordFulkerson<ValueType, EdgeType>::compute_max_flow(
+    Graph<ValueType,EdgeCapacity<EdgeType>,false>* g) {
   typedef Node<ValueType,EdgeCapacity<EdgeType>> NODE;
   auto& nodes = g->nodes;
   NODE* source = &nodes[0];
