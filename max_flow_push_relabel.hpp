@@ -293,7 +293,10 @@ void MaxFlowComputerPushRelabel<ValueType, EdgeType>
         edge_to_source, edge_from_source);
     node_info_[node_to->id].net_flow = compute_net_flow_in_out<EdgeType>(
         edge_from_source, edge_to_source);
-    add_active_node(node_to);
+    if (get_net_incoming_flow(node_to) > 0) {
+      std::cout << node_to->id << std::endl;
+      add_active_node(node_to);
+    }
     LOG3("neighbor: " << node_info_[node_to->id].DebugString());
   }
   LOG3("source: " << node_info_[source->id].DebugString());
