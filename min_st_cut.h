@@ -2,7 +2,7 @@
 #define BARRIER_MIN_ST_CUT
 
 // TODO(daddy): migrate this over to max_flow_push_relabel.hpp
-#include "max_flow_ford_fulkerson.hpp"
+#include "max_flow_push_relabel.hpp"
 #include "graph_utils.hpp"
 
 namespace min_st_cut {

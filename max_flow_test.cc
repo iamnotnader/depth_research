@@ -97,6 +97,34 @@ void TestLargeGraphPushRelabel() {
   }
 }
 
+void TestLargeGraphPushRelabelRepeat() {
+  Graph<int,EdgeCapacity<int>,false> my_g = Graph<int,EdgeCapacity<int>,false>(
+      {{0,1,2,3,4,5,6,7,8},
+      {{0,2},{0,3},{0,4},{2,3},{3,4},{2,8},{2,6},{3,6},{3,5},{4,5},{5,6},
+       {5,7},{4,7},{8,6},{6,7},{8,1},{6,1},{7,1}},
+      {12,15,20,5,11,5,2,6,3,4,6,1,8,9,7,18,13,10}});
+  MaxFlowComputerPushRelabel<int,int> mfc;
+  double max_flow = mfc.compute_max_flow(&my_g);
+  if (max_flow == 28) {
+    cgreen("PASSED: 9 nodes") << endl;
+  } else {
+    cred("FAILED: 9 nodes") << endl;
+    cout << "Expected 28; Got: " << max_flow << endl;
+  }
+  my_g = Graph<int,EdgeCapacity<int>,false>(
+      {{0,1,2,3,4,5,6,7,8},
+      {{0,2},{0,3},{0,4},{2,3},{3,4},{2,8},{2,6},{3,6},{3,5},{4,5},{5,6},
+       {5,7},{4,7},{8,6},{6,7},{8,1},{6,1},{7,1}},
+      {12,15,20,5,11,5,2,6,3,4,6,1,8,9,7,18,13,10}});
+  max_flow = mfc.compute_max_flow(&my_g);
+  if (max_flow == 28) {
+    cgreen("PASSED: 9 nodes repeat") << endl;
+  } else {
+    cred("FAILED: 9 nodes repeat") << endl;
+    cout << "Expected 28; Got: " << max_flow << endl;
+  }
+}
+
 int main() {
 
   logging_utils::print_stack_traces();
@@ -111,6 +139,7 @@ int main() {
   TestTinyGraphPushRelabel();
   TestMediumGraphPushRelabel();
   TestLargeGraphPushRelabel();
+  TestLargeGraphPushRelabelRepeat();
 
 
   return 0;

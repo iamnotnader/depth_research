@@ -71,7 +71,7 @@ vector<MinCutEdge<ValueType, EdgeType>> compute_min_st_cut(
   // the edges properly.
   //
   //TODO(daddy): Migrate this over to MaxFlowComputerPushRelabel
-  max_flow::MaxFlowComputerFordFulkerson<ValueType, EdgeType> mfc;
+  max_flow::MaxFlowComputerPushRelabel<ValueType, EdgeType> mfc;
   mfc.compute_max_flow(g);
 
   auto& nodes = g->nodes;
