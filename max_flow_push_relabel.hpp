@@ -8,6 +8,7 @@
 #include <sstream>
 #include <limits>
 #include <queue>
+#include <deque>
 #include <unordered_map>
 
 namespace max_flow {
@@ -86,6 +87,7 @@ class MaxFlowComputerPushRelabel :
 
   void initialize_data_structures(
       Graph<ValueType,EdgeCapacity<EdgeType>,false>* g);
+  void global_relabel(Graph<ValueType,EdgeCapacity<EdgeType>,false>* g);
   bool is_node_active(NODE* node);
   void add_active_node(NODE* node);
   NODE* pop_highest_active_node();
@@ -97,6 +99,57 @@ class MaxFlowComputerPushRelabel :
   void discharge_highest_label_node();
   void push_flow(NODE*from, NODE* to);
 };
+
+template<typename ValueType, typename EdgeType>
+void MaxFlowComputerPushRelabel<ValueType, EdgeType>
+    ::global_relabel(Graph<ValueType,EdgeCapacity<EdgeType>,false>* g) {
+  // Remove everything from our priority queue.
+  auto node_compare = [this](NODE* a, NODE* b) {
+    return get_label_for_node(a) < get_label_for_node(b);
+  };
+  highest_node_queue_ =
+      std::priority_queue<NODE*, vector<NODE*>,
+          std::function<bool(NODE*, NODE*)>>(node_compare);
+
+  // Relabel all the nodes.
+  vector<NODE>& nodes = g->nodes;
+  vector<bool> visited(nodes.size(), false);
+  NODE* sink = &(nodes[SINK_ID]);
+  visited[SINK_ID] = true;
+  std::deque<NODE*> q = {sink};
+  int current_label = 0;
+  int num_nodes_in_last_level = 1;
+  int num_nodes_in_new_level = 0;
+  while (!q.empty()) {
+    NODE* cur = q.front();
+    q.pop_front();
+    node_info_[cur->id].label = current_label;
+    num_nodes_in_last_level--;
+    for (size_t i = 0; i < cur->neighbors.size(); i++) {
+      NODE* nei = cur->neighbors[i];
+      if (!visited[nei->id] &&
+          get_edge_between(nei, cur)->residual() > 0) {
+        q.push_back(nei);
+        visited[nei->id] = true; 
+        num_nodes_in_new_level++;
+      }
+    }
+
+    if (num_nodes_in_last_level == 0) {
+      num_nodes_in_last_level = num_nodes_in_new_level;
+      num_nodes_in_new_level = 0;
+      current_label++;
+    }
+  }
+
+  // Add all the active nodes back onto the priority queue.
+  for (NODE& n : g->nodes) {
+    if (get_net_incoming_flow(&n) > 0 &&
+        n.id != SINK_ID && n.id != SOURCE_ID) {
+      highest_node_queue_.push(&n);
+    }
+  }
+}
 
 static int num_relabels = 0;
 template<typename ValueType, typename EdgeType>
@@ -111,14 +164,9 @@ void MaxFlowComputerPushRelabel<ValueType, EdgeType>
   int64_t min_label = std::numeric_limits<int64_t>::max();
   for (size_t i = 0; i < neighbors.size(); i++) {
     NODE* node_to = neighbors[i];
-    const EdgeCapacity<EdgeType>& edge_from_node = weights[i];
-    const EdgeCapacity<EdgeType>& edge_to_node =
-        *(get_edge_between(node_to, node));
     // Net flow is usually the flow INTO a node, so we have to negate it
     // to get the amount that's flowing FROM the node.
-    double flow_from_node = -compute_net_flow_in_out<EdgeType>(
-        edge_to_node, edge_from_node);
-    double flow_can_send = edge_from_node.capacity - flow_from_node;
+    double flow_can_send = weights[i].residual();
     if (flow_can_send > 0) {
       // Labels for nodes we are relabelling should ALWAYS be <= labels for
       // neighboring nodes we can send flow to. Otherwise, we would do a push
@@ -187,8 +235,7 @@ void MaxFlowComputerPushRelabel<ValueType, EdgeType>
     ::push_flow(NODE* node_from, NODE* node_to) {
   using internal_push_relabel::compute_net_flow_in_out;
   using internal_push_relabel::add_flow_in_out;
-  if (get_label_for_node(node_from) !=
-      (get_label_for_node(node_to) + 1)) {
+  if (get_label_for_node(node_from) <= get_label_for_node(node_to)) {
     return;
   }
   double flow_at_node = get_net_incoming_flow(node_from);
@@ -262,6 +309,7 @@ void MaxFlowComputerPushRelabel<ValueType, EdgeType>
   for (NODE& n : nodes) {
     for (int i = 0; i < n.neighbors.size(); i++) {
       NODE* neighb = n.neighbors[i];
+      n.weights[i].flow = 0;
       nodes_to_edges_[pair<NODE*,NODE*>(&n, neighb)] = &(n.weights[i]);
     }
   }
@@ -306,9 +354,19 @@ double MaxFlowComputerPushRelabel<ValueType, EdgeType>::compute_max_flow(
   LOG3("Initializing...");
   initialize_data_structures(g);
   LOG3("Finished initialization.");
+
+  int64_t num_discharges = 0;
   while (!highest_node_queue_.empty()) {
+    if (num_discharges % (g->nodes.size()) == 0) {
+      global_relabel(g);
+    }
+    if (num_discharges % 1000000 == 0) {
+      LOG0("Percent complete: "
+           << (double)num_relabels / (g->nodes.size() * g->nodes.size()) * 100);
+    }
     // Discharge the node with the highest label.
     discharge_highest_label_node();
+    num_discharges++;
   }
 
   // Compute the max flow value for the graph and return.
