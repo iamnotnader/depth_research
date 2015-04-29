@@ -80,10 +80,6 @@ class MaxFlowComputerPushRelabel :
   std::priority_queue<
       NODE*, vector<NODE*>, std::function<bool(NODE*, NODE*)>>
           highest_node_queue_;
-  std::unordered_map<
-      pair<NODE*, NODE*>, EdgeCapacity<EdgeType>*,
-      std::function<size_t(const pair<NODE*, NODE*>&)>>
-          nodes_to_edges_;
 
   void initialize_data_structures(
       Graph<ValueType,EdgeCapacity<EdgeType>,false>* g);
@@ -91,13 +87,12 @@ class MaxFlowComputerPushRelabel :
   bool is_node_active(NODE* node);
   void add_active_node(NODE* node);
   NODE* pop_highest_active_node();
-  EdgeCapacity<EdgeType>* get_edge_between(NODE* from, NODE* to);
   int64_t get_label_for_node(NODE* node);
   double get_net_incoming_flow(NODE* node);
   void set_net_incoming_flow(NODE* node, double flow);
   void relabel_node(NODE* node);
   void discharge_highest_label_node();
-  void push_flow(NODE*from, NODE* to);
+  void push_flow(NODE*from, NODE* to, EdgeCapacity<EdgeType>* edge_from_to);
 };
 
 template<typename ValueType, typename EdgeType>
@@ -128,7 +123,7 @@ void MaxFlowComputerPushRelabel<ValueType, EdgeType>
     for (size_t i = 0; i < cur->neighbors.size(); i++) {
       NODE* nei = cur->neighbors[i];
       if (!visited[nei->id] &&
-          get_edge_between(nei, cur)->residual() > 0) {
+          cur->weights[i].corresponding_edge->residual() > 0) {
         q.push_back(nei);
         visited[nei->id] = true; 
         num_nodes_in_new_level++;
@@ -182,12 +177,6 @@ void MaxFlowComputerPushRelabel<ValueType, EdgeType>
 }
 
 template<typename ValueType, typename EdgeType>
-EdgeCapacity<EdgeType>* MaxFlowComputerPushRelabel<ValueType, EdgeType>
-    ::get_edge_between(NODE* from, NODE* to) {
-  return nodes_to_edges_[pair<NODE*, NODE*>(from, to)];
-}
-
-template<typename ValueType, typename EdgeType>
 double MaxFlowComputerPushRelabel<ValueType, EdgeType>
     ::get_net_incoming_flow(NODE* node) {
   return node_info_[node->id].net_flow;
@@ -232,27 +221,26 @@ Node<ValueType,EdgeCapacity<EdgeType>>*
 
 template<typename ValueType, typename EdgeType>
 void MaxFlowComputerPushRelabel<ValueType, EdgeType>
-    ::push_flow(NODE* node_from, NODE* node_to) {
+    ::push_flow(NODE* node_from, NODE* node_to,
+                EdgeCapacity<EdgeType>* edge_from_to) {
   using internal_push_relabel::compute_net_flow_in_out;
   using internal_push_relabel::add_flow_in_out;
   if (get_label_for_node(node_from) <= get_label_for_node(node_to)) {
     return;
   }
   double flow_at_node = get_net_incoming_flow(node_from);
-  EdgeCapacity<EdgeType>* edge_from_highest =
-      get_edge_between(node_from, node_to);
-  EdgeCapacity<EdgeType>* edge_to_highest =
-      get_edge_between(node_to, node_from);
+  EdgeCapacity<EdgeType>* edge_to_from = edge_from_to->corresponding_edge;
+
   // Net flow is usually the flow INTO a node, so we have to negate it
   // to get the amount that's flowing FROM the node.
   double flow_from_highest = -compute_net_flow_in_out<EdgeType>(
-      *edge_to_highest, *edge_from_highest);
-  double flow_can_send = edge_from_highest->capacity - flow_from_highest;
+      *edge_to_from, *edge_from_to);
+  double flow_can_send = edge_from_to->capacity - flow_from_highest;
   if (flow_can_send > 0) {
     assert(node_to->id == SOURCE_ID || get_net_incoming_flow(node_to) >= 0);
     double flow_to_send = std::min(flow_at_node, flow_can_send);
     double old_flow = get_net_incoming_flow(node_to);
-    add_flow_in_out(edge_to_highest, edge_from_highest, flow_to_send);
+    add_flow_in_out(edge_to_from, edge_from_to, flow_to_send);
     flow_at_node -= flow_to_send;
     set_net_incoming_flow(node_from, flow_at_node);
     set_net_incoming_flow(node_to, old_flow + flow_to_send);
@@ -268,10 +256,10 @@ void MaxFlowComputerPushRelabel<ValueType, EdgeType>
     ::discharge_highest_label_node() {
   NODE* highest_node = pop_highest_active_node();
   const vector<NODE*>& neighbors = highest_node->neighbors;
-  const vector<EdgeCapacity<EdgeType>>& weights = highest_node->weights;
+  vector<EdgeCapacity<EdgeType>>& weights = highest_node->weights;
   while (get_net_incoming_flow(highest_node) > 0) {
     for (size_t i = 0; i < neighbors.size(); i++) {
-      push_flow(highest_node, neighbors[i]);
+      push_flow(highest_node, neighbors[i], &(weights[i]));
       if (get_net_incoming_flow(highest_node) == 0) { break; }
     }
     if (get_net_incoming_flow(highest_node) > 0) {
@@ -303,14 +291,23 @@ void MaxFlowComputerPushRelabel<ValueType, EdgeType>
     // Perfect hash function since we know the number of nodes.
     return p.first->id + p.second->id * NUM_NODES;
   };
-  nodes_to_edges_ = std::unordered_map<
+  std::unordered_map<
       pair<NODE*, NODE*>, EdgeCapacity<EdgeType>*,
-      std::function<size_t(const pair<NODE*, NODE*>&)>>(10, node_pair_hash);
+      std::function<size_t(const pair<NODE*, NODE*>&)>>
+          nodes_to_edges(nodes.size()*10, node_pair_hash);
   for (NODE& n : nodes) {
     for (int i = 0; i < n.neighbors.size(); i++) {
       NODE* neighb = n.neighbors[i];
       n.weights[i].flow = 0;
-      nodes_to_edges_[pair<NODE*,NODE*>(&n, neighb)] = &(n.weights[i]);
+      nodes_to_edges[pair<NODE*,NODE*>(&n, neighb)] = &(n.weights[i]);
+    }
+  }
+  for (NODE& n : nodes) {
+    for (int i = 0; i < n.neighbors.size(); i++) {
+      auto edge_from_n = &(n.weights[i]);
+      auto edge_to_n = nodes_to_edges[pair<NODE*,NODE*>(n.neighbors[i], &n)];
+      edge_from_n->corresponding_edge = edge_to_n;
+      edge_to_n->corresponding_edge = edge_from_n;
     }
   }
 
@@ -326,7 +323,7 @@ void MaxFlowComputerPushRelabel<ValueType, EdgeType>
   for (size_t i = 0; i < neighbors.size(); i++) {
     NODE* node_to = neighbors[i];
     auto& edge_from_source = weights[i];
-    auto& edge_to_source = *(get_edge_between(neighbors[i], source));
+    auto& edge_to_source = *(weights[i].corresponding_edge);
 
     assert(edge_from_source.capacity == edge_to_source.capacity);
 

@@ -25,6 +25,12 @@ public:
   double capacity;
   double flow;
   EdgeType edge_data;
+
+  // When dealing with undirected graphs, we implement an undirected edge as
+  // two edges in opposite directions with the same capacity. In some
+  // circumstances, it helps to have constant-time access to the opposite
+  // edge, which is what this variable provides.
+  EdgeCapacity<EdgeType>* corresponding_edge;
 };
 
 // Computes the maximum flow of an undirected graph.
