@@ -29,10 +29,10 @@ void GraphCutEnergyMinimizer::connect_pixel_to_neighbor(
      vector<PixelMetadata>* pixels,
      vector<pair<int,int>>* pixel_connections,
      vector<EdgeCapacity<EdgeMetadata>>* pixel_weights) {
-  if (from_row < 0 || from_row >= depth_map->cols ||
-      to_row < 0 || to_row >= depth_map->cols ||
-      from_col < 0 || from_col >= depth_map->rows ||
-      to_col < 0 || to_col >= depth_map->rows) {
+  if (from_row < 0 || from_row >= depth_map->rows ||
+      to_row < 0 || to_row >= depth_map->rows ||
+      from_col < 0 || from_col >= depth_map->cols ||
+      to_col < 0 || to_col >= depth_map->cols) {
     // Don't do anything if the pixel is out of bounds.
     return;
   }
@@ -182,7 +182,7 @@ graph_utils::Graph<GraphCutEnergyMinimizer::PixelMetadata,
 double GraphCutEnergyMinimizer::compute_optimal_alpha_expansion(
     int alpha_expansion_depth, const unique_ptr<Mat>& depth_map) {
 
-  // Construct the graph that. This will be a graph whose min-cut corresponds
+  // This will be a graph whose min-cut corresponds
   // to an alpha-expansion that minimzes the energy function.
   graph_utils::Graph<
       PixelMetadata, EdgeCapacity<EdgeMetadata>, false> expansion_graph =

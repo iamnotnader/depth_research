@@ -89,6 +89,9 @@ class MaxFlowComputerPushRelabel :
   // be found.
   int highest_active_node_label_;
   int num_active_nodes_;
+  // Used to do BFS in global_relabel. The cost of reallocating it every time
+  // was too large.
+  vector<bool> visited_;
 
   // Save a convenience pointer to the graph. Yes, this is dirty.
   Graph<ValueType,EdgeCapacity<EdgeType>,false>* g_;
@@ -125,11 +128,15 @@ void MaxFlowComputerPushRelabel<ValueType, EdgeType>
     pop_highest_active_node();
   }
 
+  // Reset the visited vector.
+  for (size_t i = 0; i < visited_.size(); i++) {
+    visited_[i] = false;
+  }
+
   // Relabel all the nodes.
   vector<NODE>& nodes = g_->nodes;
-  vector<bool> visited(nodes.size(), false);
   NODE* sink = &(nodes[SINK_ID]);
-  visited[SINK_ID] = true;
+  visited_[SINK_ID] = true;
   std::deque<NODE*> q = {sink};
   int current_label = 0;
   int num_nodes_in_last_level = 1;
@@ -141,10 +148,10 @@ void MaxFlowComputerPushRelabel<ValueType, EdgeType>
     num_nodes_in_last_level--;
     for (size_t i = 0; i < cur->neighbors.size(); i++) {
       NODE* nei = cur->neighbors[i];
-      if (!visited[nei->id] &&
+      if (!visited_[nei->id] &&
           cur->weights[i].corresponding_edge->residual() > 0) {
         q.push_back(nei);
-        visited[nei->id] = true; 
+        visited_[nei->id] = true; 
         num_nodes_in_new_level++;
       }
     }
@@ -282,6 +289,11 @@ void MaxFlowComputerPushRelabel<ValueType, EdgeType>
 template<typename ValueType, typename EdgeType>
 void MaxFlowComputerPushRelabel<ValueType, EdgeType>
     ::gap_relabel(int64_t gap_label) {
+  assert(gap_label != SOURCE_ID);
+  assert(gap_label != SINK_ID);
+  // TODO(daddy): Make num_nodes_per_label_ actually contain a linked list of
+  // all the nodes with that label so we can make this (and relabel) way
+  // faster.
   while (num_active_nodes_ > 0) {
     pop_highest_active_node();
   }
@@ -341,6 +353,9 @@ void MaxFlowComputerPushRelabel<ValueType, EdgeType>
   NODE* source = &nodes[SOURCE_ID];
   NODE* sink = &nodes[SINK_ID];
   num_nodes_per_label_ = vector<int64_t>(2*nodes.size());
+
+  // Used by bfs in global_relabel()
+  visited_ = vector<bool>(nodes.size());
 
   auto node_compare = [this](NODE* a, NODE* b) {
     return get_label_for_node(a) < get_label_for_node(b);

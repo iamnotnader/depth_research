@@ -10,8 +10,9 @@
 namespace graph_utils {
 
 // Node class for representing a graph.
-// TODO(daddy): Make it so values are stored in a separate array rather than
-// in the nodes themselves. That way more nodes can fit in memory/cache.
+// TODO(daddy): Consider making it so values are stored in a separate array
+// rather than in the nodes themselves. That way more nodes can fit in
+// memory/cache.
 template<typename ValueType, typename WeightType>
 class Node {
 public:
