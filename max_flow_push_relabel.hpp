@@ -82,7 +82,7 @@ class MaxFlowComputerPushRelabel :
   vector<internal_push_relabel::NodeInfo> node_info_;
   // The number of TOTAL nodes (including inactive) for each label. Used for
   // quickly determining whether or not we want to do a gap relabel.
-  vector<int64_t> num_nodes_per_label_;
+  vector<NODE*> binned_all_nodes;
   // The number of active nodes for each label.
   vector<vector<NODE*>> binned_active_nodes_;
   // The index into binned_active_nodes_ where the highest active node can
@@ -118,7 +118,51 @@ class MaxFlowComputerPushRelabel :
   int64_t get_label_for_node(NODE* node);
   double get_net_incoming_flow(NODE* node);
   void set_net_incoming_flow(NODE* node, double flow);
+  void add_node_to_bin(NODE* node, int64_t bin);
+  void remove_node_from_bin(NODE* node, int64_t bin);
 };
+
+template<typename ValueType, typename EdgeType>
+void MaxFlowComputerPushRelabel<ValueType, EdgeType>
+    ::add_node_to_bin(NODE* node, int64_t bin) {
+  int64_t node_label = get_label_for_node(node);
+  assert(node_label == bin);
+  NODE* first_node = binned_all_nodes[bin];
+  if (first_node == nullptr) {
+    binned_all_nodes[bin] = node;
+    node->prev = nullptr;
+    node->next = nullptr;
+    return;
+  }
+  // Insert the node into the linked-list corresponding to nodes with label
+  // zero.
+  binned_all_nodes[bin] = node;
+  first_node->prev = node;
+  node->next = first_node;
+  node->prev = nullptr;
+}
+
+template<typename ValueType, typename EdgeType>
+void MaxFlowComputerPushRelabel<ValueType, EdgeType>
+    ::remove_node_from_bin(NODE* node, int64_t bin) {
+  assert (get_label_for_node(node) == bin);
+  NODE* node_prev = node->prev;
+  NODE* node_next = node->next;
+  if (node_next == nullptr && node_prev == nullptr) {
+    binned_all_nodes[bin] = nullptr;
+    return;
+  }
+  if (node_prev != nullptr) {
+    node_prev->next = node_next;
+  } else {
+    binned_all_nodes[bin] = node_next;
+  }
+  if (node_next != nullptr) {
+    node_next->prev = node_prev;
+  }
+  node->next = nullptr;
+  node->prev = nullptr;
+}
 
 template<typename ValueType, typename EdgeType>
 void MaxFlowComputerPushRelabel<ValueType, EdgeType>
@@ -126,6 +170,9 @@ void MaxFlowComputerPushRelabel<ValueType, EdgeType>
   // Remove all the active nodes so we can muddle all their labels.
   while (num_active_nodes_ > 0) {
     pop_highest_active_node();
+  }
+  for (NODE& n : g_->nodes) {
+    remove_node_from_bin(&n, get_label_for_node(&n));
   }
 
   // Reset the visited vector.
@@ -165,6 +212,7 @@ void MaxFlowComputerPushRelabel<ValueType, EdgeType>
 
   // Add all the active nodes back.
   for (NODE& n : g_->nodes) {
+    add_node_to_bin(&n, get_label_for_node(&n));
     if (get_net_incoming_flow(&n) > 0 &&
         n.id != SINK_ID && n.id != SOURCE_ID) {
       add_active_node(&n);
@@ -197,9 +245,10 @@ void MaxFlowComputerPushRelabel<ValueType, EdgeType>
     }
   }
   assert(min_label != std::numeric_limits<int64_t>::max());  
-  num_nodes_per_label_[node_info_[node->id].label]--;
-  node_info_[node->id].label = min_label + 1;
-  num_nodes_per_label_[node_info_[node->id].label]++;
+  remove_node_from_bin(node, get_label_for_node(node));
+  int64_t new_label = min_label + 1;
+  node_info_[node->id].label = new_label;
+  add_node_to_bin(node, new_label);
 }
 
 template<typename ValueType, typename EdgeType>
@@ -289,29 +338,28 @@ void MaxFlowComputerPushRelabel<ValueType, EdgeType>
 template<typename ValueType, typename EdgeType>
 void MaxFlowComputerPushRelabel<ValueType, EdgeType>
     ::gap_relabel(int64_t gap_label) {
-  assert(gap_label != SOURCE_ID);
-  assert(gap_label != SINK_ID);
-  // TODO(daddy): Make num_nodes_per_label_ actually contain a linked list of
-  // all the nodes with that label so we can make this (and relabel) way
-  // faster.
-  while (num_active_nodes_ > 0) {
-    pop_highest_active_node();
-  }
-  for (int i = 0; i < num_nodes_per_label_.size(); i++) {
-    num_nodes_per_label_[i] = 0;
-  }
-  for (NODE& n : g_->nodes) {
-    if (node_info_[n.id].label >= gap_label) {
-      node_info_[n.id].label = std::max(
-          (int64_t)node_info_[n.id].label,
-          (int64_t)g_->nodes.size());
+  // TODO(daddy): I think we can actually relabel gapped nodes to infinity
+  // but need to see...
+  int64_t num_nodes = g_->nodes.size(); 
+  for (int i = gap_label; i < num_nodes; i++) {
+    // Upgrade all the nodes, including the inactive ones. This messes up
+    // binned_active_nodes_ but it's ok because we fix it right after.
+    while (binned_all_nodes[i] != nullptr) {
+      NODE* cur = binned_all_nodes[i];
+      remove_node_from_bin(cur, i);
+      node_info_[cur->id].label = num_nodes;
+      add_node_to_bin(cur, num_nodes);
     }
-    num_nodes_per_label_[node_info_[n.id].label]++;
-
-    if (get_net_incoming_flow(&n) > 0 &&
-        n.id != SINK_ID && n.id != SOURCE_ID) {
-      add_active_node(&n);
+    // Upgrade all of the active nodes (fixing what we broke above).
+    for (NODE* n : binned_active_nodes_[i]) {
+      node_info_[n->id].label = num_nodes;
+      binned_active_nodes_[num_nodes].push_back(n);
     }
+    binned_active_nodes_[i].clear();
+  }
+  if (highest_active_node_label_ < num_nodes &&
+      binned_active_nodes_[num_nodes].size() > 0) {
+    highest_active_node_label_ = num_nodes;
   }
 }
 
@@ -327,8 +375,9 @@ void MaxFlowComputerPushRelabel<ValueType, EdgeType>
       if (get_net_incoming_flow(highest_node) == 0) { break; }
     }
     if (get_net_incoming_flow(highest_node) > 0) {
-      int64_t highest_node_label = node_info_[highest_node->id].label;
-      if (num_nodes_per_label_[highest_node_label] == 1) {
+      int64_t highest_node_label = get_label_for_node(highest_node);
+      assert (binned_all_nodes[highest_node_label] != nullptr);
+      if (binned_all_nodes[highest_node_label]->next == nullptr) {
         // If this is the last node with its label, we'll have a gap. So we
         // should also relabel all the other nodes.
         gap_relabel(highest_node_label);
@@ -352,7 +401,7 @@ void MaxFlowComputerPushRelabel<ValueType, EdgeType>
   auto& nodes = g->nodes;
   NODE* source = &nodes[SOURCE_ID];
   NODE* sink = &nodes[SINK_ID];
-  num_nodes_per_label_ = vector<int64_t>(2*nodes.size());
+  binned_all_nodes = vector<NODE*>(2*nodes.size(), nullptr);
 
   // Used by bfs in global_relabel()
   visited_ = vector<bool>(nodes.size());
@@ -364,20 +413,25 @@ void MaxFlowComputerPushRelabel<ValueType, EdgeType>
   highest_active_node_label_ = 0;
   int num_nodes = nodes.size();
   auto node_pair_hash = [num_nodes](const pair<NODE*,NODE*>& p) {
-    // Perfect hash function since we know the number of nodes.
+    // TODO(daddy): Make this more rando. Seems to work fine right now and
+    // it's fast...
     return p.first->id + p.second->id * num_nodes;
   };
   std::unordered_map<
       pair<NODE*, NODE*>, EdgeCapacity<EdgeType>*,
       std::function<size_t(const pair<NODE*, NODE*>&)>>
           nodes_to_edges(nodes.size()*10, node_pair_hash);
+  // Build the hashmap of node pairs to edges.
   for (NODE& n : nodes) {
     for (int i = 0; i < n.neighbors.size(); i++) {
       NODE* neighb = n.neighbors[i];
       n.weights[i].flow = 0;
+      n.next = nullptr;
+      n.prev = nullptr;
       nodes_to_edges[pair<NODE*,NODE*>(&n, neighb)] = &(n.weights[i]);
     }
   }
+  // Use the hashmap we built above to correspond all the edges with each other.
   for (NODE& n : nodes) {
     for (int i = 0; i < n.neighbors.size(); i++) {
       auto edge_from_n = &(n.weights[i]);
@@ -417,6 +471,10 @@ void MaxFlowComputerPushRelabel<ValueType, EdgeType>
   }
   LOG3("source: " << node_info_[source->id].DebugString());
   LOG3("Number of active nodes: " << num_active_nodes_);
+  for (NODE& n : nodes) {
+    int64_t node_label = get_label_for_node(&n);
+    add_node_to_bin(&n, node_label);
+  }
 }
 
 // Computes the maximum flow of an undirected graph.

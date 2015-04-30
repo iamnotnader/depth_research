@@ -32,6 +32,11 @@ public:
   ValueType value;
   std::vector<Node<ValueType,WeightType>*> neighbors;
   std::vector<WeightType> weights;
+
+  // This is so we can put nodes in a linked-list. This enables fast
+  // gap relabling in the push-relabel algorithm.
+  Node<ValueType,WeightType>* next;
+  Node<ValueType,WeightType>* prev;
 };
 
 template<typename ValueType, typename WeightType, bool is_directed>
