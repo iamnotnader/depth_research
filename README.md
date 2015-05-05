@@ -4,8 +4,7 @@ using two stereo images (but soon arbitrary collections of images).
 To see it in action, just do:
 $ ./run_tests
 
-Note that you must first install the opencv libraries. You can do this with
-homebrew on OSX.
+Note that you must first install the opencv libraries because I use them to do basic matrix manipulation and image display stuff. You can do this with homebrew on OSX.
 
 Results as of 4/16/2015. This approach uses dynamic programming to assign depths to pixels one a line-by-line basis, as described in [this paper](http://citeseerx.ist.psu.edu/viewdoc/download?doi=10.1.1.108.4866&rep=rep1&type=pdf) (slightly simpler than the Ohta-Kanade method). The downside of this approach is that "streaks" appear, since the line-by-line approximation isn't global, and so can't make inter-line adjustments:
 ![alt tag](http://i.imgur.com/qexurn3.jpg)
